@@ -13,12 +13,16 @@ Codex sandbox's default write access to /tmp and $TMPDIR is turned off, so shell
 writes reach only the copy (untested beyond a dry run). Copies live under
 ~/.cache/mnemorph-replay, inside the already trusted home directory. The run
 still uses the user's Codex login and global config, so it is not a separate
-Codex home. Standard library only; needs the `codex` CLI.
+Codex home, and each copy adds a trusted-project entry to ~/.codex/config.toml;
+run `--prune-trust` once after a batch finishes (not while runs are live, since
+Codex rewrites that file) to remove the entries for replay copies. Standard
+library only; needs the `codex` CLI.
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -53,12 +57,29 @@ def codex_command(copy: Path, out: Path, a) -> list[str]:
     return cmd
 
 
+def prune_trust() -> int:
+    """Remove trusted-project entries that replay copies added to Codex config."""
+    config = Path.home() / ".codex" / "config.toml"
+    text = config.read_text(encoding="utf-8")
+    pattern = re.compile(r'^\[projects\."[^"]*/\.cache/mnemorph-replay/[^"]*"\]\n'
+                         r'(?:(?!\[).*\n)*', re.M)
+    found = pattern.findall(text)
+    if found:
+        backup = config.with_name("config.toml.before-replay-prune")
+        backup.write_text(text, encoding="utf-8")
+        config.write_text(pattern.sub("", text), encoding="utf-8")
+    print(f"removed {len(found)} replay trust entries from {config}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--commit", required=True, help="tree the replay starts from")
-    ap.add_argument("--prompt-file", required=True, help="the user's request, verbatim")
-    ap.add_argument("--out", required=True, help="directory for events.jsonl and last.md")
+    ap.add_argument("--commit", help="tree the replay starts from")
+    ap.add_argument("--prompt-file", help="the user's request, verbatim")
+    ap.add_argument("--out", help="directory for events.jsonl and last.md")
+    ap.add_argument("--prune-trust", action="store_true",
+                    help="after a batch: remove replay copies' trust entries, then exit")
     ap.add_argument("--patch", help="patch applied and committed before the run")
     ap.add_argument("--copy", action="append", metavar="SRC=DEST",
                     help="file copied into the copy at DEST (relative), e.g. gitignored state")
@@ -68,6 +89,10 @@ def main() -> int:
     ap.add_argument("--keep", action="store_true", help="keep the copy for inspection")
     ap.add_argument("--dry-run", action="store_true", help="print the codex command only")
     a = ap.parse_args()
+    if a.prune_trust:
+        return prune_trust()
+    if not (a.commit and a.prompt_file and a.out):
+        ap.error("--commit, --prompt-file and --out are required for a replay")
 
     out = Path(a.out).resolve()
     base = Path.home() / ".cache" / "mnemorph-replay"
