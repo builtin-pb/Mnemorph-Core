@@ -84,13 +84,23 @@ def cmd_record(a) -> int:
     }
     if a.judge:
         entry["judge"] = a.judge.strip()
-    if a.note:
+    for key, val in (("failed_on", a.failed_on), ("replayed_on", a.replayed_on)):
+        if val:
+            entry[key] = val.strip()
+    if (a.result == "pass" and a.failed_on and a.replayed_on
+            and a.failed_on.strip() != a.replayed_on.strip()):
+        # Models differ in habit; a pass elsewhere does not show the lesson
+        # carries on the model that missed it.
+        entry["result"] = "unverified"
+        entry["note"] = (f"passed on {a.replayed_on.strip()}, not on "
+                         f"{a.failed_on.strip()}" + (f"; {a.note.strip()}" if a.note else ""))
+    if a.note and "note" not in entry:
         entry["note"] = a.note.strip()
     path = root / LEDGER
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    print(f"recorded {a.result} for {a.file} @ {commit[:7]} in {LEDGER}")
+    print(f"recorded {entry['result']} for {a.file} @ {commit[:7]} in {LEDGER}")
     return 0
 
 
@@ -153,6 +163,10 @@ def main() -> int:
     p.add_argument("--result", required=True, choices=RESULTS)
     p.add_argument("--evidence", help="path to outputs and verdicts")
     p.add_argument("--judge", help="who judged: script, model, or the person")
+    p.add_argument("--failed-on", help="host/model where the miss happened, "
+                   "e.g. codex/gpt-6-astra")
+    p.add_argument("--replayed-on", help="host/model the replay ran on; a pass "
+                   "on another model is recorded as unverified")
     p.add_argument("--note")
     p.set_defaults(fn=cmd_record)
     p = sub.add_parser("list", help="show recorded tests")

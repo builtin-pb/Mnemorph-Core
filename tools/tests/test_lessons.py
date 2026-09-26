@@ -103,6 +103,18 @@ class LessonsToolTests(unittest.TestCase):
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
         self.assertIn("no untested guidance changes", out)
 
+    def test_pass_on_another_model_stays_candidate(self):
+        self.write("src/writing/compose.md", GUIDE + "Rule three.\n")
+        self.commit("Add rule three")
+        _, out = self.run_tool("record", "--lesson", "x", "--file",
+                               "src/writing/compose.md", "--commit", "HEAD",
+                               "--kind", "judgment", "--case", "c", "--check", "k",
+                               "--result", "pass", "--failed-on", "codex/gpt-6-astra",
+                               "--replayed-on", "claude/opus-5.5")
+        self.assertIn("recorded unverified", out)
+        _, out = self.run_tool("candidates", f"{self.base}..HEAD")
+        self.assertIn("src/writing/compose.md: unverified", out)
+
 
 if __name__ == "__main__":
     unittest.main()

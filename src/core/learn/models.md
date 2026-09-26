@@ -18,6 +18,10 @@ When a model misses judgment its instructions already require, route that judgme
 
 Vendors release models every few weeks; recheck which available model and price fit each role when a new model appears.
 
+## Observed habits
+
+Models differ in habit as well as strength. One may keep to a request's literal scope and leave facts it has just read unused in a draft for someone else; another may read widely but fill gaps with inference stated as fact or relay unchecked claims. Plan checks around the habit of the model doing the work, and test a lesson on the model that showed the miss ([lesson tests](../memory/lesson-tests.md)). An instance's settings can record which of its models showed which habit.
+
 ## What agents can choose
 
 Agents choose models only for work they launch: subagents, Guard delegates, `codex exec` runs and experiments. The main session, scheduled tasks and Codex automations take model and effort from app settings that only the user controls; a scheduled reflection, if configured, runs on the host's default, which may be weaker or lower in effort than its judgment needs. Report such a mismatch with these roles to the user rather than working around it. Whether Codex subagents can run a different model is unchecked.
