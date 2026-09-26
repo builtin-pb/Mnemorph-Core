@@ -15,7 +15,8 @@ class DryRun(unittest.TestCase):
                               "--dry-run"], text=True, capture_output=True, check=True).stdout
         for flag in ("--ephemeral", "-s workspace-write", 'approval_policy="never"',
                      "--disable apps", "--disable plugins", "--disable computer_use",
-                     "--disable browser_use", "--disable in_app_browser"):
+                     "--disable browser_use", "--disable in_app_browser",
+                     "exclude_slash_tmp=true", "exclude_tmpdir_env_var=true"):
             self.assertIn(flag, out)
         self.assertNotIn("danger", out)
 

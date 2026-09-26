@@ -7,10 +7,13 @@ from a fresh clone at a given commit, with an optional patch applied and
 committed and optional files copied in (for example gitignored working state),
 then writes the event log and final reply to an output directory.
 
-The run cannot act outside its copy: connectors, plugins, browsers and computer
-use are off, shell writes are sandboxed to the copy, and escalation requests are
-refused (approval policy "never"). The copy has no Git remote. Standard library
-only; needs the `codex` CLI.
+Isolation: connectors, plugins, browsers and computer use are off; escalation
+requests are refused (approval policy "never"); the copy has no Git remote; the
+Codex sandbox's default write access to /tmp and $TMPDIR is turned off, so shell
+writes reach only the copy (untested beyond a dry run). Copies live under
+~/.cache/mnemorph-replay, inside the already trusted home directory. The run
+still uses the user's Codex login and global config, so it is not a separate
+Codex home. Standard library only; needs the `codex` CLI.
 """
 
 from __future__ import annotations
@@ -36,7 +39,9 @@ def run(cmd: list[str], **kw) -> None:
 def codex_command(copy: Path, out: Path, a) -> list[str]:
     cmd = ["codex", "exec", "-C", str(copy), "--ephemeral", "--json",
            "-o", str(out / "last.md"), "-s", "workspace-write",
-           "-c", 'approval_policy="never"']
+           "-c", 'approval_policy="never"',
+           "-c", "sandbox_workspace_write.exclude_slash_tmp=true",
+           "-c", "sandbox_workspace_write.exclude_tmpdir_env_var=true"]
     for feature in DISABLED:
         cmd += ["--disable", feature]
     if a.model:
@@ -65,7 +70,9 @@ def main() -> int:
     a = ap.parse_args()
 
     out = Path(a.out).resolve()
-    work = Path(tempfile.mkdtemp(prefix="mnemorph-replay-"))
+    base = Path.home() / ".cache" / "mnemorph-replay"
+    base.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="run-", dir=base))
     copy = work / "Mnemorph"
     cmd = codex_command(copy, out, a)
     if a.dry_run:
