@@ -1,0 +1,5 @@
+interface:
+  display_name: "Reflect"
+  short_description: "Review and revise useful memory"
+policy:
+  allow_implicit_invocation: true

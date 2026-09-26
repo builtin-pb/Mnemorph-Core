@@ -1,0 +1,5 @@
+interface:
+  display_name: "Learn"
+  short_description: "Edit prompts and agent instructions; design workflows"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,1 @@
+Keep the user's active project as the working directory; the personal account is written in this framework. Read the framework's `AGENTS.md` and `src/core/__entry__.md`, then use Personalize at `src/core/memory/personalize.md`. Sources named with the invocation are the user's to read.

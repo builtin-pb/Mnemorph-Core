@@ -1,0 +1,4 @@
+.mnemorph-local/
+.eval/
+.test-tmp/
+__pycache__/

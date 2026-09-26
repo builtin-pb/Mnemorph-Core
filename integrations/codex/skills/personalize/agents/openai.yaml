@@ -1,0 +1,5 @@
+interface:
+  display_name: "Personalize"
+  short_description: "Learn about you from your materials"
+policy:
+  allow_implicit_invocation: true
