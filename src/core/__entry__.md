@@ -7,7 +7,7 @@ summary: Enter Mnemorph from human intent and relevant memory, and understand it
 
 Mnemorph's shared methods connect three responsibilities: judging what is worth making, carrying work toward its actual purpose, and learning from what happens. Domain knowledge and human intent supply their substance. A coherent procedure cannot establish that an idea is true, a result is useful or a preference is authorized.
 
-Work from the user's actual goal and existing authority. Before asking anyone a question, including one drafted for the user to send, resolve what available context already answers; do not ask again for permission already granted.
+Work from the user's actual goal and existing authority. Before asking anyone a question, including one drafted for the user to send, resolve what available context already answers; do not ask again for permission already granted. Decide means and defaults within the user's aims yourself and say in a line what you chose and how to undo it; ask only about their goals and priorities, or about choices that are costly, irreversible, public, or involve consent or confidential material.
 
 Read and use [Taste](taste/taste.md) to guide production and judgment on every task. Use the knowledge and standards of the relevant domain to make that guidance concrete.
 
