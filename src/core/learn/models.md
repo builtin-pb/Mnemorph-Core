@@ -20,7 +20,7 @@ Vendors release models every few weeks; recheck which available model and price 
 
 ## Observed habits
 
-Models differ in habit as well as strength. One may keep to a request's literal scope and leave facts it has just read unused in a draft for someone else; another may read widely but fill gaps with inference stated as fact or relay unchecked claims. Plan checks around the habit of the model doing the work, and test a lesson on the model that showed the miss ([lesson tests](../memory/lesson-tests.md)). An instance's settings can record which of its models showed which habit.
+Models differ in habit as well as strength. One may keep to a request's literal scope and leave facts it has just read unused in a draft for someone else; another may read widely but fill gaps with inference stated as fact or relay unchecked claims. A literal-scope model may carry out concrete steps in its instructions almost every time while no stated principle changes its route; for it, express the judgment it needs as a step with a visible output. Plan checks around the habit of the model doing the work, and test a lesson on the model that showed the miss ([lesson tests](../memory/lesson-tests.md)). An instance's settings can record which of its models showed which habit.
 
 ## What agents can choose
 
