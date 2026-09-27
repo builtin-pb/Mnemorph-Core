@@ -1,6 +1,6 @@
 ---
 id: core.memory.personalize
-summary: Build or extend the user's personal memory from what they offer (agent histories, host memories, documents, exports) within a default one-hour cap: agree on sources, ask for those an agent cannot reach, read recent material in full, audit coverage.
+summary: Build or extend the user's personal memory from what they offer (agent histories, host memories, documents, exports) in about an hour by default: agree on sources, ask for those an agent cannot reach, read recent material in full, audit coverage.
 ---
 
 # Personalize
@@ -9,7 +9,7 @@ Use this when the user asks Mnemorph to learn about them from their materials, s
 
 A helper needs the user's current role and place, commitments and deadlines, recent major events, health or constraints that change advice, key people and how the user likes help.
 
-Unless the user sets another budget, a run ends an hour after it starts; say so in your first message. Check the clock before each source or part, give parallel readers and the auditor the deadline, and stop reading at 45 minutes to write, audit and report. Never wait past the deadline for a helper; use what returned and record the gap.
+Unless the user sets another budget, a run takes about an hour; say so in your first message. Check the clock before each source or part, give parallel readers and the auditor the deadline, and start no new reading after about 45 minutes. A little overtime to finish is fine; don't wait long past the hour for a stalled helper: use what returned and record the gap.
 
 ## Agree on sources
 
@@ -18,7 +18,7 @@ When `src/personal/` exists, start from its source map: a later run covers new s
 - **Read now:** the user's typed words to coding agents (`python3 tools/record.py append` collects Codex and Claude Code into `src/record/`; read others in place); host memories and instruction files, such as `CLAUDE.md`, `AGENTS.md` and memory folders; files the user names, such as a CV, notes, a diary or photos. Invoking this authorizes them.
 - **Read once they agree:** connected accounts, such as mail, calendar, chat and drives; sites the host's browser is signed in to; public pages the user or their sources link to.
 - **Quick from the user:** what other assistants, such as ChatGPT, Gemini or Claude, remember about them, pasted in minutes where an export takes days; their CV or profile links; who the people in their busiest chats are, a word each.
-- **Needing the user's action:** data exports, such as ChatGPT, Claude or Google Takeout, including accounts that leave nothing on the computer, such as other mail, social or fitness services; protected messages, such as iMessage, which needs disk access; apps without a plain export, such as WeChat, only by a route the user accepts and never one that risks their account; connectors they could enable; longer transcript retention where the host deletes old ones (Claude Code: after 30 days unless `cleanupPeriodDays` is raised).
+- **Needing the user's action:** data exports, such as ChatGPT, Claude or Google Takeout, including accounts that leave nothing on the computer, such as other mail, social or fitness services; protected messages, such as iMessage, which needs disk access; apps without a plain export, such as WeChat, only by a route the user accepts and never one that risks their account; connectors they could enable; longer transcript retention where the host deletes old ones (Claude Code: terminal sessions after 30 days unless `cleanupPeriodDays` is raised).
 - **Limits:** what the user wants kept out. Credentials, recovery codes and secrets always stay out.
 
 Leaving out what is settled, the message says what you will read and that it goes to the model provider, including others' messages; asks to read what needs agreement; makes the quick asks; for each need above that no found source covers, names a source that could fill it with its route as currently documented, where to put the result (in place or under `.mnemorph-local/`) and what it would add, or asks for a few sentences; and asks for limits. Read what is authorized while they answer. Never change system settings or run third-party extractors on protected app data yourself.
@@ -48,4 +48,4 @@ Report briefly, by domain, what was recorded, then coverage and gaps, and ask wh
 
 ## Shaping experience
 
-An agent sampled a large archive, declared it done and missed three consequential recent events. In three replays with one model, this method made it read the whole recent year (8–47% without) yet record none of the three; per-chunk fact notes recovered all three. After an import took 3.7 active hours with about nine readers, its user asked for the one-hour default; a dry run of the source step missed sources that leave no local trace.
+An agent sampled a large archive, declared it done and missed three consequential recent events. In three replays with one model, this method made it read the whole recent year (8–47% without) yet record none of the three; per-chunk fact notes recovered all three. A user asked for a default of about an hour after a 3.7-hour import; a dry run of the source step missed sources with no local trace.
