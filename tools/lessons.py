@@ -118,12 +118,21 @@ def mainstream(root: Path) -> list[str]:
         return []
 
 
+def model_key(label: str) -> str:
+    """One name per model however a run labels it: claude/opus-5.5,
+    claude-code/claude-opus-5-5 and claude-opus-5-5 are the same model."""
+    name = (label or "").strip().lower().rsplit("/", 1)[-1].replace(".", "-")
+    return name[len("claude-"):] if name.startswith("claude-") else name
+
+
 def status(rows: list[dict], required: list[str]) -> str:
     """'pass' once each required model, and the model that missed the lesson,
     has a passing replay; otherwise what is missing. Models differ in habit,
     so a pass on one does not show the lesson carries on another."""
-    need = set(required) | {r["failed_on"] for r in rows if r.get("failed_on")}
-    passed = {r.get("replayed_on", "") for r in rows if r.get("result") == "pass"}
+    unknown = {"", "unknown"}
+    need = {model_key(m) for m in required} | {
+        model_key(r["failed_on"]) for r in rows if r.get("failed_on")} - unknown
+    passed = {model_key(r.get("replayed_on", "")) for r in rows if r.get("result") == "pass"}
     if not rows:
         return "untested"
     if not need:
