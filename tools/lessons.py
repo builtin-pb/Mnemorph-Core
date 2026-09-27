@@ -20,6 +20,7 @@ from pathlib import Path
 
 DEFAULT_ROOT = Path(os.environ.get("MNEMORPH", Path(__file__).resolve().parents[1]))
 LEDGER = Path("src/research/lesson-tests.jsonl")
+MODELS = Path("src/lesson-models.json")  # optional: models every lesson must pass on
 KINDS = ("concrete", "judgment")
 RESULTS = ("pass", "fail", "unverified")
 # Guidance lives under src/ unless it declares role: reference; these never count.
@@ -87,13 +88,6 @@ def cmd_record(a) -> int:
     for key, val in (("failed_on", a.failed_on), ("replayed_on", a.replayed_on)):
         if val:
             entry[key] = val.strip()
-    if (a.result == "pass" and a.failed_on and a.replayed_on
-            and a.failed_on.strip() != a.replayed_on.strip()):
-        # Models differ in habit; a pass elsewhere does not show the lesson
-        # carries on the model that missed it.
-        entry["result"] = "unverified"
-        entry["note"] = (f"passed on {a.replayed_on.strip()}, not on "
-                         f"{a.failed_on.strip()}" + (f"; {a.note.strip()}" if a.note else ""))
     if a.note and "note" not in entry:
         entry["note"] = a.note.strip()
     path = root / LEDGER
@@ -116,13 +110,40 @@ def cmd_list(a) -> int:
     return 0
 
 
+def mainstream(root: Path) -> list[str]:
+    """The models every lesson must pass on, from src/lesson-models.json."""
+    try:
+        return list(json.loads((root / MODELS).read_text(encoding="utf-8"))["models"])
+    except (OSError, ValueError, KeyError):
+        return []
+
+
+def status(rows: list[dict], required: list[str]) -> str:
+    """'pass' once each required model, and the model that missed the lesson,
+    has a passing replay; otherwise what is missing. Models differ in habit,
+    so a pass on one does not show the lesson carries on another."""
+    need = set(required) | {r["failed_on"] for r in rows if r.get("failed_on")}
+    passed = {r.get("replayed_on", "") for r in rows if r.get("result") == "pass"}
+    if not rows:
+        return "untested"
+    if not need:
+        return "pass" if passed else rows[-1].get("result", "untested")
+    missing = sorted(need - passed)
+    if not missing:
+        return "pass"
+    have = sorted(need & passed)
+    return (f"passed on {', '.join(have)}; " if have else "") + "missing " + ", ".join(missing)
+
+
 def cmd_candidates(a) -> int:
-    """Per guidance file changed in RANGE, the changes with no recorded pass."""
+    """Per guidance file changed in RANGE, the changes not yet passed on every
+    required model."""
     root = Path(a.root)
     commits = git(root, "rev-list", "--reverse", a.range).split()
-    latest: dict[tuple[str, str], str] = {}
+    required = mainstream(root)
+    tests: dict[tuple[str, str], list[dict]] = {}
     for r in read_ledger(root):
-        latest[(r.get("file"), r.get("commit", ""))] = r.get("result", "")
+        tests.setdefault((r.get("file"), r.get("commit", "")), []).append(r)
     by_file: dict[str, list[tuple[str, str, str]]] = {}
     for c in commits:
         files = git(root, "diff-tree", "--no-commit-id", "--name-only", "-r",
@@ -130,11 +151,11 @@ def cmd_candidates(a) -> int:
         for f in files:
             if not is_guidance(root, c, f):
                 continue
-            result = latest.get((f, c), "")
+            result = status(tests.get((f, c), []), required)
             if result == "pass":
                 continue
             subject = git(root, "log", "-1", "--format=%s", c).strip()
-            by_file.setdefault(f, []).append((c[:7], subject, result or "untested"))
+            by_file.setdefault(f, []).append((c[:7], subject, result))
     for f, rows in by_file.items():
         c, subject, result = rows[-1]
         more = f" and {len(rows) - 1} earlier" if len(rows) > 1 else ""
@@ -165,8 +186,8 @@ def main() -> int:
     p.add_argument("--judge", help="who judged: script, model, or the person")
     p.add_argument("--failed-on", help="host/model where the miss happened, "
                    "e.g. codex/gpt-6-astra")
-    p.add_argument("--replayed-on", help="host/model the replay ran on; a pass "
-                   "on another model is recorded as unverified")
+    p.add_argument("--replayed-on", help="host/model the replay ran on; record "
+                   "one replay per model")
     p.add_argument("--note")
     p.set_defaults(fn=cmd_record)
     p = sub.add_parser("list", help="show recorded tests")

@@ -111,9 +111,27 @@ class LessonsToolTests(unittest.TestCase):
                                "--kind", "judgment", "--case", "c", "--check", "k",
                                "--result", "pass", "--failed-on", "codex/gpt-6-astra",
                                "--replayed-on", "claude/opus-5.5")
-        self.assertIn("recorded unverified", out)
+        self.assertIn("recorded pass", out)
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
-        self.assertIn("src/writing/compose.md: unverified", out)
+        self.assertIn("src/writing/compose.md: missing codex/gpt-6-astra", out)
+
+    def test_a_lesson_is_learned_only_on_every_mainstream_model(self):
+        self.write("src/lesson-models.json",
+                   '{"models": ["claude/opus-5.5", "codex/gpt-6-astra", "codex/gpt-6-sol"]}')
+        self.write("src/writing/compose.md", GUIDE + "Rule four.\n")
+        self.commit("Add rule four")
+        def record(model, result="pass"):
+            self.run_tool("record", "--lesson", "x", "--file", "src/writing/compose.md",
+                          "--commit", "HEAD", "--kind", "concrete", "--case", "c",
+                          "--check", "k", "--result", result, "--replayed-on", model)
+        record("claude/opus-5.5")
+        record("codex/gpt-6-sol", "fail")
+        _, out = self.run_tool("candidates", f"{self.base}..HEAD")
+        self.assertIn("passed on claude/opus-5.5; missing codex/gpt-6-astra, codex/gpt-6-sol", out)
+        record("codex/gpt-6-astra")
+        record("codex/gpt-6-sol")
+        _, out = self.run_tool("candidates", f"{self.base}..HEAD")
+        self.assertNotIn("Add rule four", out)
 
 
 if __name__ == "__main__":
