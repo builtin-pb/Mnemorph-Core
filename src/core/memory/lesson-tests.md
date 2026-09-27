@@ -19,7 +19,7 @@ Take the task that prompted the lesson, or a close variant when the original can
 - **Judgment lesson:** it needs reading, such as how an ending lands, whether reasoning connects or whether a claim is scoped. Give a fresh judge the correction in the user's words with its reason and the two outputs, unlabeled and in random order, and ask which one the correction fits better and why. First validate the judge: give it the output the user corrected beside a repaired one, and revise its brief, without naming the answer, until it picks against the corrected output.
 - Ask the person who gave the correction to judge only when a judge cannot decide or its reason looks unsound, since it costs their attention. An unattended run records `unverified` and lists it for them.
 
-If the miss recurs, the instruction has not carried the lesson. Make it more concrete or checkable, or move it into an operation, and replay once more; otherwise record `fail` and report the instruction as a candidate.
+If the miss recurs, the instruction has not carried the lesson. Make it more concrete or checkable, or move it into an operation, and replay once more. If it still fails, take it out of active memory, which keeps memory lean, and park it: record `parked` with the removed text and the commit that removed it (`--removed-text`, `--parked-by`), beside the correction and its cases. Later Learn work picks parked lessons up (`python3 tools/lessons.py list --result parked`), first when their correction repeats.
 
 ## Record
 

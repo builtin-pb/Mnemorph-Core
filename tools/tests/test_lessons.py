@@ -115,6 +115,24 @@ class LessonsToolTests(unittest.TestCase):
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
         self.assertIn("missing gpt-6-astra", out)
 
+    def test_a_parked_lesson_leaves_candidates_and_keeps_its_text(self):
+        self.write("src/writing/compose.md", GUIDE + "Rule six.\n")
+        c = self.commit("Add rule six")
+        self.run_tool("record", "--lesson", "x", "--file", "src/writing/compose.md",
+                      "--commit", c, "--kind", "concrete", "--case", "c", "--check", "k",
+                      "--result", "fail")
+        self.write("src/writing/compose.md", GUIDE)
+        removal = self.commit("Park rule six")
+        self.run_tool("record", "--lesson", "x", "--file", "src/writing/compose.md",
+                      "--commit", c, "--kind", "concrete", "--case", "c", "--check", "k",
+                      "--result", "parked", "--removed-text", "Rule six.",
+                      "--parked-by", removal)
+        _, out = self.run_tool("candidates", f"{self.base}..HEAD")
+        self.assertNotIn("rule six", out)
+        _, out = self.run_tool("list", "--result", "parked")
+        self.assertIn("src/writing/compose.md", out)
+        self.assertIn('"removed": "Rule six."', (self.root / "src/research/lesson-tests.jsonl").read_text())
+
     def test_a_one_model_lesson_is_learned_when_the_others_do_no_worse(self):
         self.write("src/lesson-models.json",
                    '{"models": ["claude/opus-5.5", "codex/gpt-6-astra", "codex/gpt-6-sol"]}')

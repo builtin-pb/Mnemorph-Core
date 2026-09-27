@@ -22,7 +22,7 @@ DEFAULT_ROOT = Path(os.environ.get("MNEMORPH", Path(__file__).resolve().parents[
 LEDGER = Path("src/research/lesson-tests.jsonl")
 MODELS = Path("src/lesson-models.json")  # optional: models every lesson must pass on
 KINDS = ("concrete", "judgment")
-RESULTS = ("pass", "fail", "unverified")
+RESULTS = ("pass", "fail", "unverified", "parked")
 # Guidance lives under src/ unless it declares role: reference; these never count.
 EXCLUDED = (re.compile(r"^src/personal/"), re.compile(r"^src/record/"),
             re.compile(r"^src/inbox\.md$"))
@@ -85,6 +85,16 @@ def cmd_record(a) -> int:
     }
     if a.judge:
         entry["judge"] = a.judge.strip()
+    if a.result == "parked":
+        # A lesson that failed its replays leaves active memory; its text and
+        # the commit that removed it stay here for later Learn work.
+        if not (a.removed_text and a.parked_by):
+            raise SystemExit("parked needs --removed-text and --parked-by")
+        text = Path(a.removed_text)
+        entry["removed"] = (text.read_text(encoding="utf-8") if text.is_file()
+                            else a.removed_text).strip()
+        entry["parked_by"] = git(root, "rev-parse", "--verify",
+                                 f"{a.parked_by}^{{commit}}").strip()
     for key, val in (("failed_on", a.failed_on), ("replayed_on", a.replayed_on)):
         if val:
             entry[key] = val.strip()
@@ -102,6 +112,8 @@ def cmd_list(a) -> int:
     rows = read_ledger(Path(a.root))
     if a.file:
         rows = [r for r in rows if r.get("file") == a.file]
+    if a.result:
+        rows = [r for r in rows if r.get("result") == a.result]
     for r in rows[-a.limit:]:
         print(f"{r['time']}  {r['result']:<10} {r['kind']:<8} "
               f"{r['file']} @ {r['commit'][:7]}  {r['lesson'][:80]}")
@@ -162,8 +174,11 @@ def cmd_candidates(a) -> int:
     commits = git(root, "rev-list", "--reverse", a.range).split()
     required = mainstream(root)
     tests: dict[tuple[str, str], list[dict]] = {}
+    removals: set[str] = set()
     for r in read_ledger(root):
         tests.setdefault((r.get("file"), r.get("commit", "")), []).append(r)
+        if r.get("parked_by"):
+            removals.add(r["parked_by"])
     by_file: dict[str, list[tuple[str, str, str]]] = {}
     for c in commits:
         files = git(root, "diff-tree", "--no-commit-id", "--name-only", "-r",
@@ -171,7 +186,10 @@ def cmd_candidates(a) -> int:
         for f in files:
             if not is_guidance(root, c, f):
                 continue
-            result = status(tests.get((f, c), []), required)
+            rows = tests.get((f, c), [])
+            if c in removals or any(r.get("result") == "parked" for r in rows):
+                continue  # parked lessons and the commits that removed them
+            result = status(rows, required)
             if result == "pass":
                 continue
             subject = git(root, "log", "-1", "--format=%s", c).strip()
@@ -208,11 +226,15 @@ def main() -> int:
                    "e.g. codex/gpt-6-astra")
     p.add_argument("--replayed-on", help="host/model the replay ran on; record "
                    "one replay per model")
+    p.add_argument("--removed-text", help="for parked: the removed instruction, "
+                   "or a file holding it")
+    p.add_argument("--parked-by", help="for parked: the commit that removed it")
     p.add_argument("--note")
     p.set_defaults(fn=cmd_record)
     p = sub.add_parser("list", help="show recorded tests")
     p.add_argument("--file")
     p.add_argument("--limit", type=int, default=30)
+    p.add_argument("--result", choices=RESULTS, help="only rows with this result")
     p.set_defaults(fn=cmd_list)
     p = sub.add_parser("candidates",
                        help="guidance changes in a commit range with no test")
