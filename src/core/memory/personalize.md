@@ -25,7 +25,7 @@ Leaving out what is settled, the message says what you will read; asks to read w
 
 ## Read by what a helper needs
 
-Inventory each source's structure, size and date span before reading, and keep coverage as you go. Read in this order, each source from the latest backward, as far as the cap allows, and record where you stopped:
+Inventory each source's structure, size and date span before reading, and keep coverage as you go. Read in this order, each source newest first, as far as the cap allows, and record where you stopped:
 
 1. The user's own statements to agents and existing host memories: standing preferences and corrections. Other assistants' memories are their inferences.
 2. The latest self-descriptions (CV, bio, homepage), dated against later sources.
@@ -36,7 +36,7 @@ Split large reading by source or period, among read-only subagents when availabl
 
 ## Write the account
 
-Follow `src/personal/README.md`, or copy it from `memory-template/personal/` and fill it, with detail in a few files by life domain. Give every file the `id`, `role: reference` and `summary` header; lookups skip files without one. Date what can change, attribute sources, mark inferences and let later direct statements win. Keep the source map: each source's location, what was read, coverage, gaps and pending sources.
+Follow `src/personal/README.md`, or copy it from `memory-template/personal/` and fill it, with detail in a few files by life domain. Put how they like work done (code, reports) under "How they like help". Give every file the `id`, `role: reference` and `summary` header; lookups skip files without one. Date what can change, attribute sources, mark inferences and let later direct statements win. Keep the source map: each source's location, what was read, coverage, gaps and pending sources.
 
 ## Audit before finishing
 
