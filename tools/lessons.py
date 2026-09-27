@@ -126,22 +126,33 @@ def model_key(label: str) -> str:
 
 
 def status(rows: list[dict], required: list[str]) -> str:
-    """'pass' once each required model, and the model that missed the lesson,
-    has a passing replay; otherwise what is missing. Models differ in habit,
-    so a pass on one does not show the lesson carries on another."""
-    unknown = {"", "unknown"}
-    need = {model_key(m) for m in required} | {
-        model_key(r["failed_on"]) for r in rows if r.get("failed_on")} - unknown
-    passed = {model_key(r.get("replayed_on", "")) for r in rows if r.get("result") == "pass"}
+    """'pass' once the model that missed the lesson passes and every other
+    required model does no worse (both arms passing counts). A lesson fixing
+    one model's habit cannot gain on models that never had it. Later rows
+    for a model supersede earlier ones."""
     if not rows:
         return "untested"
-    if not need:
-        return "pass" if passed else rows[-1].get("result", "untested")
-    missing = sorted(need - passed)
-    if not missing:
+    unknown = {"", "unknown"}
+    failing = {model_key(r["failed_on"]) for r in rows if r.get("failed_on")} - unknown
+    others = {model_key(m) for m in required} - failing
+    latest: dict[str, str] = {}
+    for r in rows:
+        latest[model_key(r.get("replayed_on", ""))] = r.get("result", "")
+    gained = sorted(m for m in latest if latest[m] == "pass")
+    if not failing and not gained:
+        return rows[-1].get("result", "untested")
+    missing = sorted(m for m in failing if m not in latest)
+    missing += sorted(m for m in others if m not in latest)
+    failed = sorted(m for m in failing if m in latest and latest[m] != "pass")
+    failed += sorted(m for m in others if latest.get(m) == "fail")
+    if not missing and not failed:
         return "pass"
-    have = sorted(need & passed)
-    return (f"passed on {', '.join(have)}; " if have else "") + "missing " + ", ".join(missing)
+    parts = [f"passed on {', '.join(gained)}"] if gained else []
+    if failed:
+        parts.append("not passed on " + ", ".join(failed))
+    if missing:
+        parts.append("missing " + ", ".join(missing))
+    return "; ".join(parts)
 
 
 def cmd_candidates(a) -> int:

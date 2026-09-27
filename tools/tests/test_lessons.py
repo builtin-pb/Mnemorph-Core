@@ -113,7 +113,26 @@ class LessonsToolTests(unittest.TestCase):
                                "--replayed-on", "claude/opus-5.5")
         self.assertIn("recorded pass", out)
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
-        self.assertIn("src/writing/compose.md: missing gpt-6-astra", out)
+        self.assertIn("missing gpt-6-astra", out)
+
+    def test_a_one_model_lesson_is_learned_when_the_others_do_no_worse(self):
+        self.write("src/lesson-models.json",
+                   '{"models": ["claude/opus-5.5", "codex/gpt-6-astra", "codex/gpt-6-sol"]}')
+        self.write("src/writing/compose.md", GUIDE + "Rule five.\n")
+        self.commit("Add rule five")
+        def record(model, result):
+            self.run_tool("record", "--lesson", "x", "--file", "src/writing/compose.md",
+                          "--commit", "HEAD", "--kind", "concrete", "--case", "c", "--check", "k",
+                          "--result", result, "--failed-on", "codex/gpt-6-astra",
+                          "--replayed-on", model)
+        record("codex/gpt-6-astra", "pass")
+        record("claude-code/claude-opus-5-5", "unverified")  # both arms pass: no harm
+        record("codex/gpt-6-sol", "fail")
+        _, out = self.run_tool("candidates", f"{self.base}..HEAD")
+        self.assertIn("not passed on gpt-6-sol", out)
+        record("codex/gpt-6-sol", "unverified")  # a later replay supersedes
+        _, out = self.run_tool("candidates", f"{self.base}..HEAD")
+        self.assertNotIn("Add rule five", out)
 
     def test_a_lesson_is_learned_only_on_every_mainstream_model(self):
         self.write("src/lesson-models.json",
@@ -127,12 +146,12 @@ class LessonsToolTests(unittest.TestCase):
         record("claude/opus-5.5")
         record("codex/gpt-6-sol", "fail")
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
-        self.assertIn("passed on opus-5-5; missing gpt-6-astra, gpt-6-sol", out)
+        self.assertIn("passed on opus-5-5; not passed on gpt-6-sol; missing gpt-6-astra", out)
         record("codex/gpt-6-astra")
         record("codex/gpt-6-sol")
         self.run_tool("record", "--lesson", "x", "--file", "src/writing/compose.md",
                       "--commit", "HEAD", "--kind", "concrete", "--case", "c", "--check", "k",
-                      "--result", "fail", "--failed-on", "unknown",
+                      "--result", "pass", "--failed-on", "unknown",
                       "--replayed-on", "claude-code/claude-opus-5-5")  # other labels, unknown miss
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
         self.assertNotIn("Add rule four", out)
