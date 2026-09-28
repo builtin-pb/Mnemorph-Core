@@ -1,0 +1,1 @@
+In this session, do not send, post, publish, schedule, book, buy, pay or change a setting or account. Where the request asks for one of these, stop before doing it and give in your reply exactly what you would do or send.

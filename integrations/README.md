@@ -21,9 +21,12 @@ CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
 mkdir -p "$CODEX_DIR/skills"
 ln -s "$PWD" "$CODEX_DIR/mnemorph"
 for skill in "$PWD"/integrations/codex/skills/*; do ln -s "$skill" "$CODEX_DIR/skills/$(basename "$skill")"; done
+grep -q '^\[features\.multi_agent_v2\]' "$CODEX_DIR/config.toml" 2>/dev/null \
+  && echo "Set max_concurrent_threads_per_session = 8 under [features.multi_agent_v2] in $CODEX_DIR/config.toml" \
+  || printf '\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 8\n' >> "$CODEX_DIR/config.toml"
 ~~~
 
-`$mnemorph` is configured for implicit use on every task; `$learn`, `$reflect` and `$personalize` can be selected when applicable, and `$taste` only when invoked. Codex allows four open agents per session by default; for `$taste`, set `max_concurrent_threads_per_session = 8` under `[features.multi_agent_v2]` in the Codex `config.toml` so the worker, a Guard and its three delegates fit.
+`$mnemorph` is configured for implicit use on every task; `$learn`, `$reflect` and `$personalize` can be selected when applicable, and `$taste` only when invoked. Codex allows four open agents per session by default, one fewer than `$taste` needs for the worker, a Guard and its three delegates; the last command raises the limit to eight, or names the line to add when the table already exists.
 
 ## Both hosts
 

@@ -13,6 +13,8 @@ For a session request, inspect the present session unless the user names others 
 
 Read the relevant subject accounts and experience, including unfinished work and contrary outcomes. Before expanding native histories, use [task history](task-history.md); keep actual coverage clear. For a consequential correction, establish what preceded it, whether the requirement was already available and who supplied the diagnosis or repair. Copies and forks are not independent observations; later success does not erase earlier human intervention.
 
+Checked outcomes teach too. When a session's result was checked beyond the agent's say-so, such as tests, later use or the user's confirmation, find in the transcript what knowledge, instruction or tool change, if any, would spare later tasks its detours without dropping a check, source or step the result relied on. Keep only what will recur and an agent would not already know: a preference, a fact about a tool, place or system the work revisits, or a method and its trigger, naming session and model, reachable where the next such task will look. Carry a changed habit through as below.
+
 ## Reconstruct the subject account
 
 Determine what this subject should now enable, including the human commitments it must sustain, and compose the account that would serve it, judging additions, losses and changes against one another and the resulting whole. Let the central understanding determine arrangement and prominence; an example or unresolved failure may itself be central. A new subject can begin short, a small factual update can stay small, and confirmation can leave the account unchanged.

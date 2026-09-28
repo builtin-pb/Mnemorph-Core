@@ -8,6 +8,8 @@ summary: Retrieve bounded native dialogue with scope and cutoff checks, current 
 
 These observations from one instance are practical retrieval knowledge, not an API specification. Coverage means material read; inventory, status, saved transcript and inspected dialogue differ.
 
+To see where a session's effort went without reading its whole transcript, `python3 tools/sessions.py timeline <id or path>` prints the user's messages, the agent's replies, each tool call (`[bg]` marks a background command, which holds no turn), failures and idle gaps; `rank --since <time>` orders recent sessions by effort. It shows calls, not their output: read the transcript where a claim depends on what a call returned.
+
 ## Fix scope before opening bodies
 
 Fix eligibility and cutoff. If archived work is excluded, check explicit archive state and parent edges before bodies; another source cannot bypass exclusion. Unknown eligibility is a gap. Archive exclusion is invocation-specific.
