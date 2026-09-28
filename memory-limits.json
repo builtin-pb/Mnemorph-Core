@@ -27,13 +27,13 @@
     "src/core/learn/learn.md": 10500,
     "src/core/learn/mechanism-design.md": 8500,
     "src/core/memory/memory.md": 9250,
-    "src/core/memory/periodic-reflection.md": 6408,
+    "src/core/memory/periodic-reflection.md": 7091,
     "src/core/memory/personalize.md": 7550,
-    "src/core/memory/reflect.md": 6775,
+    "src/core/memory/reflect.md": 7363,
     "src/core/memory/task-history.md": 6100,
     "src/core/scrutiny/behavioral-evidence.md": 8650,
-    "src/core/taste/guard/charter.md": 7611,
+    "src/core/taste/guard/charter.md": 7819,
     "src/core/taste/theory.md": 7000,
-    "tools/README.md": 6073
+    "tools/README.md": 6330
   }
 }

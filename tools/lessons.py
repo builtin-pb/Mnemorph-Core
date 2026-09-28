@@ -69,6 +69,22 @@ def is_guidance(root: Path, rev: str, path: str) -> bool:
     return not re.search(r"^role:\s*reference\s*$", head, re.M)
 
 
+def outside_reads(root: Path, evidence: str | None) -> list[str]:
+    """Replay directories under the evidence path whose contaminated.json is non-empty."""
+    if not evidence:
+        return []
+    base = (root / evidence.split()[0]).resolve()
+    base = base if base.is_dir() else base.parent
+    hits = []
+    for f in sorted(base.glob("**/contaminated.json")):
+        try:
+            if json.loads(f.read_text()):
+                hits.append(f.parent.name)
+        except (OSError, json.JSONDecodeError):
+            hits.append(f.parent.name)
+    return hits
+
+
 def cmd_record(a) -> int:
     root = Path(a.root)
     commit = git(root, "rev-parse", "--verify", f"{a.commit}^{{commit}}").strip()
@@ -98,6 +114,13 @@ def cmd_record(a) -> int:
     for key, val in (("failed_on", a.failed_on), ("replayed_on", a.replayed_on)):
         if val:
             entry[key] = val.strip()
+    leaked = outside_reads(root, a.evidence) if a.result == "pass" else []
+    if leaked and entry["result"] == "pass":
+        # A replay that read evaluation material or state from after the replayed
+        # request may have seen the answer; it cannot show the lesson carried.
+        entry["result"] = "unverified"
+        entry["note"] = (f"{len(leaked)} replay(s) contaminated ({', '.join(leaked[:3])})"
+                         + (f"; {a.note.strip()}" if a.note else ""))
     if a.note and "note" not in entry:
         entry["note"] = a.note.strip()
     path = root / LEDGER

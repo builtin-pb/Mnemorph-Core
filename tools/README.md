@@ -1,6 +1,6 @@
 # Memory tools
 
-[modules.py](modules.py) discovers indexed memory, captures selected inputs and checks structure and size. [memory.py](memory.py) checks Markdown budgets and recovers bounded Git history. [record.py](record.py) appends the user's typed Claude Code and Codex messages from allowed projects (`projects`, `allow`) to `src/record/` ([template](../memory-template/record/README.md)), redacting credentials; `append` and `check` print counts, never message text. [repeats.py](repeats.py) labels repeated corrections in the record and [lessons.py](lessons.py) logs lesson tests, with ledgers in the instance's `src/research/`; [codex_replay.py](codex_replay.py) replays one on Codex in a sandboxed copy. [push_guard.py](push_guard.py) lets a commit reach a remote not pinned private only with Core files and a reviewer's clean verdict ([brief](push_review.md)). From another project, run them by absolute path; they default to this repository.
+[modules.py](modules.py) discovers indexed memory, captures selected inputs and checks structure and size. [memory.py](memory.py) checks Markdown budgets, which [size_guard.py](size_guard.py) enforces at commit, and recovers bounded Git history. [record.py](record.py) appends the user's typed Claude Code and Codex messages from allowed projects (`projects`, `allow`) to `src/record/` ([template](../memory-template/record/README.md)), redacting credentials; `append` and `check` print counts, never message text. [repeats.py](repeats.py) labels repeated corrections and [lessons.py](lessons.py) logs lesson tests, with ledgers in the instance's `src/research/`; [replay.py](replay.py) replays one on Codex or Claude Code in a sealed copy. [sessions.py](sessions.py) shows where sessions' effort went (`rank`, `timeline`, `failures`). [push_guard.py](push_guard.py) sends a remote not pinned private only Core files a reviewer cleared ([brief](push_review.md)). From another project, run them by absolute path; they default to this repository.
 
 ~~~sh
 python tools/modules.py list --query writing --limit 5
@@ -14,11 +14,11 @@ python tools/repeats.py count
 python -m unittest discover -s tools/tests
 ~~~
 
-The [retrieval contract](../src/core/memory/retrieval.md) covers discovery, section search (600-character excerpts by default; `--limit` and `--excerpt-chars` change the display, not the scan), roles, assembly and repository validation, and [budgets and history](../src/core/memory/budgets-and-history.md) covers size checks and exceptional Git recovery.
+The [retrieval contract](../src/core/memory/retrieval.md) covers discovery, section search (600-character excerpts by default; `--limit` and `--excerpt-chars` change only the display), roles, assembly and repository validation, and [budgets and history](../src/core/memory/budgets-and-history.md) covers size checks and exceptional Git recovery.
 
 ## Budgets
 
-[memory-limits.json](../memory-limits.json) is the shared size policy and names only Core files. An instance keeps allowances for its own memory in an optional `src/memory-limits.json` with `rules` and `files` in the same form; its rules apply after the shared ones and its file limits replace shared ones.
+[memory-limits.json](../memory-limits.json) is the shared size policy and names only Core files. An instance keeps allowances for its own memory in an optional `src/memory-limits.json` with `rules` and `files` in the same form; its rules apply after the shared ones and its file limits replace shared ones. [size_guard.py](size_guard.py) `install` adds a pre-commit hook refusing to grow a governed file past its limit (inbox exempt).
 
 ## Record check
 
@@ -40,6 +40,6 @@ Other wording still misses: `buy` does not find `purchase`.
 
 ## Tests
 
-The [module suite](tests/test_modules.py) exercises discovery, query matching, source identity, selection, Markdown references and validation, and checks this repository itself. Its Markdown cases, including LF/CRLF/CR source lines, test the subset the retrieval contract defines; [CommonMark](https://spec.commonmark.org/0.31.2/) is the syntax basis, not a conformance claim. The [memory suite](tests/test_memory.py) covers budget reports, instance allowances and bounded recovery. The [record suite](tests/test_record.py) uses synthetic transcripts of both hosts for inclusion, exclusion, deduplication, idempotent appends, redaction and stance. The [record-check](tests/test_record_check.py), [repeats](tests/test_repeats.py) and [lessons](tests/test_lessons.py) suites use synthetic records and Git histories; the [push-guard suite](tests/test_push_guard.py) pushes into temporary bare repositories.
+The [module suite](tests/test_modules.py) exercises discovery, query matching, source identity, selection, Markdown references and validation, and checks this repository itself. Its Markdown cases, including LF/CRLF/CR source lines, test the subset the retrieval contract defines; [CommonMark](https://spec.commonmark.org/0.31.2/) is the syntax basis, not a conformance claim. The [memory suite](tests/test_memory.py) covers budget reports, instance allowances and bounded recovery. The [record suite](tests/test_record.py) uses synthetic transcripts of both hosts for inclusion, exclusion, deduplication, idempotent appends, redaction and stance; the [sessions suite](tests/test_sessions.py) uses them too. The [record-check](tests/test_record_check.py), [repeats](tests/test_repeats.py) and [lessons](tests/test_lessons.py) suites use synthetic records and Git histories; the [push-guard suite](tests/test_push_guard.py) pushes to temporary bare repositories.
 
 Passing these tests and checks establishes representation, links and helper behaviour, not semantic recall, prompt quality or good work from the retrieved memory.
