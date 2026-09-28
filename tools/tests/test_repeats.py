@@ -32,11 +32,11 @@ class RepeatsToolTests(unittest.TestCase):
         (self.root / "src" / "record").mkdir(parents=True)
         (self.root / "src" / "research").mkdir(parents=True)
         rows = [
-            entry(1, "2026-09-20T10:00:00.000Z", "your replies are way too long, give me the decisions only"),
-            entry(2, "2026-09-26T10:00:00.000Z", "wow that's again a lot of information in your reply"),
-            entry(3, "2026-09-26T10:05:00.000Z", "please add a table of contents to the README"),
+            entry(1, "2026-09-20T10:00:00.000Z", "your summaries are too long, put the decisions first"),
+            entry(2, "2026-09-26T10:00:00.000Z", "again this summary is too long, decisions first please"),
+            entry(3, "2026-09-26T10:05:00.000Z", "please rename the output folder"),
             entry(4, "2026-09-26T10:06:00.000Z", "yes", kind="question_reply"),
-            entry(5, "2026-09-26T10:07:00.000Z", "don't poll while the experiment runs"),
+            entry(5, "2026-09-26T10:07:00.000Z", "don't restart the build while it is still running"),
         ]
         (self.root / "src" / "record" / "2026-09.jsonl").write_text(
             "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
@@ -62,7 +62,7 @@ class RepeatsToolTests(unittest.TestCase):
                                      "--describe", "keep replies short: lead with decisions")
         self.assertEqual(code, 0, err)
         self.run_tool("verdict", "claude:m3", "none")
-        self.run_tool("verdict", "claude:m5", "new", "--describe", "do not poll while work runs")
+        self.run_tool("verdict", "claude:m5", "new", "--describe", "do not restart running work")
         code, _, err = self.run_tool("verdict", "claude:m3", "none")
         self.assertEqual(code, 2)  # already labelled
         _, out, _ = self.run_tool("count", "--since", "2026-09-25T18:00:00Z", "--new-since", "2000-01-01T00:00:00Z")
@@ -72,9 +72,9 @@ class RepeatsToolTests(unittest.TestCase):
         self.assertEqual(result["repeats"], 1)
         self.assertEqual(result["corrections"], 2)
         self.assertEqual(result["repeats_listed"][0]["kind"], "keep replies short: lead with decisions")
-        self.assertIn("do not poll while work runs", [k["describe"] for k in result["new_kinds"]])
+        self.assertIn("do not restart running work", [k["describe"] for k in result["new_kinds"]])
         ledger = (self.root / repeats.LEDGER).read_text()
-        self.assertNotIn("a lot of information", ledger)  # ids, never text
+        self.assertNotIn("summary is too long", ledger)  # ids, never text
 
     def test_second_correction_and_packet_catalog_grow_between_packets(self):
         self.run_tool("verdict", "claude:m2", "new", "--describe", "keep replies short")
