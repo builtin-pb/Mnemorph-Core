@@ -8,11 +8,7 @@ Coding agents remember what you told them. Mnemorph learns from it. Every correc
 
 - **Learns the reason, not just the rule.** Mnemorph reads each correction for why it holds and when, then revises the method that went wrong.
 - **Tests what it learns.** A new rule stays a candidate until replaying the task that taught it shows the new behavior, and replaying unrelated past requests shows it breaks nothing.
-- **Thinks with [Taste](src/core/taste/taste.md).** Every task starts by checking memory against your request: is it already done, does it rest on a wrong premise, is there a better route? The agent settles the details itself and asks you only about goals and costly choices.
-- **Argues with itself.** `/taste` starts a Taste Guard, an independent agent that asks *whether* and *why* one level above the work, up to whether the whole project should change course.
-- **Knows you.** `/personalize` reads what you offer, such as agent histories, documents, and chat or mail exports, and writes an account of your life and work, so you stop repeating yourself.
-- **Keeps itself sharp.** `/reflect` reviews recent sessions, files what you said where it belongs, and revises or forgets what has gone stale. Size budgets make memory condense instead of pile up.
-- **Rewrites its own methods.** `/learn` builds and revises prompts and workflows, Mnemorph's own included.
+- **Thinks before it acts.** Every task starts by checking what it remembers against your request: is it already done, does it rest on a wrong premise, is there a better route? It settles the details itself and asks you only about goals and costly choices.
 - **Stays yours.** Every change is a commit you can read and revert, and one memory serves both Claude Code and Codex.
 
 ## Get started
@@ -31,9 +27,20 @@ Then:
 
 1. Link your copy into [Claude Code or Codex](integrations/README.md).
 2. To back up your memory, add a **private** repository as `origin` and push to it.
-3. Open a session and run `/personalize`. In Codex, skills start with `$`, as in `$personalize`.
+3. Open a session and run `/personalize`.
 
-From then on, Mnemorph loads on every task.
+## Use it
+
+Mnemorph loads on every task without being asked. Work as usual, and when your agent gets something wrong, just say so: Mnemorph notes your words, and reflection files them into memory. Four commands do more:
+
+| Command | When to use it |
+| --- | --- |
+| `/personalize` | First, and whenever you have new material. It reads what you offer, such as agent histories, documents, and chat or mail exports, and writes an account of your life and work, so you stop repeating yourself. |
+| `/reflect` | After a session worth learning from, or on a schedule. It files what you said where it belongs and revises or forgets what has gone stale. |
+| `/learn` | To build or improve a prompt, a workflow or a capability, Mnemorph's own included. |
+| `/taste` | On work that matters. It starts a Taste Guard, an independent agent that asks *whether* and *why* one level above the work, up to whether the whole project should change course. |
+
+In Codex, type `$` instead of `/`, as in `$personalize`.
 
 ## Core and your instance
 
