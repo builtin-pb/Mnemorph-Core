@@ -1,79 +1,58 @@
 # Mnemorph
 
-Mnemorph is a codebase of **Intent, Context, Knowledge and Method** for doing work and learning from it. Coherent subjects hold the understanding, procedures, examples and evaluations they need. [Taste](src/core/taste/taste.md) guides production and judgment; [Theory](src/core/taste/theory.md) explains their interaction and the allocation of finite effort.
+**Memory that learns how you work.**
 
-## Core and instances
+Coding agents remember what you told them. Mnemorph learns from it. Every correction you give Claude Code or Codex becomes a lasting change to how they judge, plan and work, and it carries to every case where the same reason holds. Your memory is a Git repository of plain Markdown that both agents load on every task.
 
-Mnemorph-Core is the official framework: shared methods in `src/core/`, helpers in `tools/`, host skills in `integrations/`, starter memory in `memory-template/`, and the root files (`AGENTS.md`, this README, `memory-limits.json`, `.gitattributes`, `.gitignore`). It holds no one's memory.
+## What it does
 
-Each person's Mnemorph is an instance: a separate Git repository derived from Core, holding its own copy of Core plus that person's memory in the rest of `src/`: the subject map `src/README.md`, `src/inbox.md`, `src/personal/`, `src/record/` and any subjects it grows. An instance may change its own Core, takes official changes selectively and can offer its Core changes back. Personal material never goes upstream.
+- **Learns the reason, not just the rule.** Mnemorph reads each correction for why it holds and when, then revises the method that went wrong.
+- **Tests what it learns.** A new rule stays a candidate until replaying the task that taught it shows the new behavior, and replaying unrelated past requests shows it breaks nothing.
+- **Thinks with [Taste](src/core/taste/taste.md).** Every task starts by checking memory against your request: is it already done, does it rest on a wrong premise, is there a better route? The agent settles the details itself and asks you only about goals and costly choices.
+- **Argues with itself.** `/taste` starts a Taste Guard, an independent agent that asks *whether* and *why* one level above the work, up to whether the whole project should change course.
+- **Knows you.** `/personalize` reads what you offer, such as agent histories, documents, and chat or mail exports, and writes an account of your life and work, so you stop repeating yourself.
+- **Keeps itself sharp.** `/reflect` reviews recent sessions, files what you said where it belongs, and revises or forgets what has gone stale. Size budgets make memory condense instead of pile up.
+- **Rewrites its own methods.** `/learn` builds and revises prompts and workflows, Mnemorph's own included.
+- **Stays yours.** Every change is a commit you can read and revert, and one memory serves both Claude Code and Codex.
 
-## Create an instance
+## Get started
+
+You need Git, Python 3.10+, and Claude Code or Codex.
 
 ~~~sh
-git clone <Mnemorph-Core URL> my-mnemorph && cd my-mnemorph
+git clone https://github.com/builtin-pb/Mnemorph-Core.git my-mnemorph && cd my-mnemorph
 git remote rename origin upstream
 cp -R memory-template/. src/
 git add src && git commit -m "Start memory"
-git remote add origin <private repository URL>   # optional; it must be private
+python3 tools/push_guard.py install origin
 ~~~
 
-Then link the instance into Claude Code or Codex as [integrations](integrations/README.md) describes, and invoke `$personalize` (`/personalize` in Claude Code) to have Mnemorph learn about you from materials you offer. The helpers need Python 3.10+ and the standard library.
+Then:
 
-## Start a task
+1. Link your copy into [Claude Code or Codex](integrations/README.md).
+2. To back up your memory, add a **private** repository as `origin` and push to it.
+3. Open a session and run `/personalize`. In Codex, skills start with `$`, as in `$personalize`.
 
-Start every task through [Entry](src/core/__entry__.md), which applies Taste. Invoke `$taste` to start a session-scoped Taste Guard, `$learn` for prompt creation or editing, workflow design or capability development, `$reflect` for memory reflection, or `$personalize` for your personal account. Entering Learn need not start a study or experiment for a small edit.
+From then on, Mnemorph loads on every task.
 
-~~~sh
-python tools/modules.py list --query writing
-python tools/modules.py search --query 'human correction' --limit 5
-~~~
+## Core and your instance
 
-`list` discovers documents from their summaries. `search` finds sections inside them, including factual context and particulars that have no separate file. Read the relevant source before relying on it. Explicit `role: reference` keeps factual and evaluation material selectable as data wherever it lives; guidance can be selected as instructions. Neither location nor retrieval grants authority. See [retrieval](src/core/memory/retrieval.md).
-
-## Find a subject
-
-Start with the instance's subject map, `src/README.md`; each subject folder's `README.md` gives its overview, and known material can be read directly. [Learn](src/core/learn/learn.md) governs prompt and workflow changes and capability development; [Prompt Writing](src/core/learn/prompt-writing.md) composes instructions and [Mechanism Design](src/core/learn/mechanism-design.md) develops operations and workflows. [Review](src/core/scrutiny/review.md), [Construction and contest](src/core/scrutiny/construction-and-contest.md) and [Behavioral evidence](src/core/scrutiny/behavioral-evidence.md) support scrutiny. [Tools](tools/README.md) covers discovery, snapshots and executable checks.
-
-## Reflect and revise
-
-[Reflect](src/core/memory/reflect.md) weighs what to retain, forget and revise in a coherent subject account; [Memory](src/core/memory/memory.md) organizes and adopts those changes. Examples, tests, failed attempts and feedback are ordinary parts of their subjects. Git preserves committed history for possible recovery, as [budgets and history](src/core/memory/budgets-and-history.md) explains; it does not guarantee future discovery or present applicability.
-
-## Take official updates
+This repository is **Mnemorph-Core**: shared methods, tools and host integrations, and no one's memory. The methods start at [the Core entry](src/core/__entry__.md). Your clone becomes your **instance**: Core plus your own memory in `src/`. You can change anything in it, Core included, and take official updates when you want them:
 
 ~~~sh
 git fetch upstream
-git log --oneline HEAD..upstream/main   # review what is new
-git merge upstream/main                 # take everything, or
-git cherry-pick <commit>                # take one change
+git log --oneline HEAD..upstream/main   # see what's new
+git merge upstream/main                 # or cherry-pick only what you want
 ~~~
-
-After a merge, `git revert <commit>` declines a change; later merges will not bring it back. Where you changed Core yourself, resolve conflicts by what you want to keep, then run the checks.
-
-## Offer Core changes back
-
-Commit Core changes apart from memory: a Core commit touches only Core paths and quotes no memory, names no one and carries no personal paths, dates or examples. Offer them from a worktree on upstream:
-
-~~~sh
-git fetch upstream
-git worktree add -b offer/<topic> ../mnemorph-offer upstream/main && cd ../mnemorph-offer
-git cherry-pick <core commits>
-git diff --name-only upstream/main | grep -vE '^(src/core/|tools/|integrations/|memory-template/|AGENTS\.md$|README\.md$|memory-limits\.json$|\.git(attributes|ignore)$)'   # must print nothing
-git push <your fork of Mnemorph-Core> offer/<topic>
-~~~
-
-Then open a pull request, read its whole diff first and remove the worktree. Never push the instance's own branches to upstream or to any public remote.
 
 ## Privacy
 
-The rest of `src/`, `src/memory-limits.json` and `.mnemorph-local/` are the instance's own and never go upstream; neither does anything drawn from them. Push the instance only to a remote confirmed private. Keep live controls, secrets, credentials and transient execution state in native storage or the ignored `.mnemorph-local/`.
+Your memory lives in your instance. Push it only to a private repository. The push guard refuses to send anything outside Core's files to any remote you have not marked private. Keep secrets and credentials out of memory.
 
-## Change and check
+## Contributing
 
-~~~sh
-python tools/modules.py check
-python tools/memory.py sizes --limit 20
-python -m unittest discover -s tools/tests
-~~~
+Improvements to Core are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to offer them from your instance.
 
-These check representation, links, size budgets and the helpers, not the quality of an agent's work; [Scrutiny and evidence](src/core/scrutiny/README.md) explains what evaluations establish. Keep provenance and supported scope close to claims, reconcile concurrent edits and commit coherent changes.
+## License
+
+[Apache-2.0](LICENSE)
