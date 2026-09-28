@@ -5,7 +5,13 @@
 redacts credentials and appends entries that are not yet recorded. `check`
 validates the record. Neither command prints message text. `model_at` names the
 model that answered a message; tools/repeats.py uses it to count repeated
-corrections by model.
+corrections by model. A session whose working directory is inside a folder
+holding `.mnemorph-private` (or is that folder) is skipped; because the record
+is append-only, a session recorded before its project was marked private stays
+recorded. src/record/projects.json can further restrict recording to chosen
+project folders (missing file: record everything, as before); `allow` edits
+it and `projects` reports each seen folder's status. A session outside the
+allowlist is held, not recorded, until its folder is allowed.
 """
 from __future__ import annotations
 
@@ -24,6 +30,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 HOME = Path.home()
 TEMP_PREFIXES = ("/tmp/", "/private/tmp/", "/var/folders/", "/private/var/folders/")
+PRIVATE_MARKER = ".mnemorph-private"
 CONTEXT_HEAD, CONTEXT_TAIL = 300, 700
 REPLAY_WINDOW_S = 3600
 
@@ -256,6 +263,76 @@ def temp_cwd(cwd) -> bool:
     return isinstance(cwd, str) and (cwd + "/").startswith(TEMP_PREFIXES)
 
 
+def private_cwd(cwd) -> bool:
+    """True when `cwd` holds `.mnemorph-private`, or any folder above it does.
+    When `cwd` no longer exists on disk the marker can't be checked, so it is
+    treated as private rather than risk recording something confidential."""
+    if not isinstance(cwd, str) or not cwd:
+        return False
+    here = Path(cwd)
+    if not here.exists():
+        return True
+    here = here.resolve()
+    return any((d / PRIVATE_MARKER).exists() for d in (here, *here.parents))
+
+
+POLICY_PARTS = ("src", "record", "projects.json")
+
+
+class Policy:
+    """The recording policy from src/record/projects.json. "all" records every
+    project (today's behaviour). "allowed" records only sessions whose cwd is
+    inside one of `folders` (already `~`-expanded and resolved); everything
+    else is held, not recorded, until its folder is allowed."""
+
+    def __init__(self, mode: str, folders: tuple[Path, ...] = ()):
+        self.mode = mode
+        self.folders = folders
+
+    def allows(self, cwd) -> bool:
+        if self.mode == "all":
+            return True
+        if not isinstance(cwd, str) or not cwd:
+            return False  # no folder to check: can't prove it's allowed
+        here = Path(cwd).resolve()
+        return any(here == folder or folder in here.parents for folder in self.folders)
+
+
+def policy_path(root: Path) -> Path:
+    return root.joinpath(*POLICY_PARTS)
+
+
+def load_policy(root: Path) -> Policy:
+    """Load the recording policy. No file: "all", so existing instances keep
+    working. A malformed file raises ValueError; callers treat that as
+    recording nothing and reporting the error, rather than guessing."""
+    path = policy_path(root)
+    if not path.is_file():
+        return Policy("all")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"{path}: can't read projects.json ({error})") from None
+    if not isinstance(data, dict) or data.get("record") not in ("all", "allowed"):
+        raise ValueError(f'{path}: "record" must be "all" or "allowed"')
+    if data["record"] == "all":
+        return Policy("all")
+    allowed = data.get("allowed")
+    if not isinstance(allowed, list) or not all(isinstance(item, str) and item.strip() for item in allowed):
+        raise ValueError(f'{path}: "allowed" must be a list of path strings')
+    return Policy("allowed", tuple(Path(item).expanduser().resolve() for item in allowed))
+
+
+def folder_status(cwd: str, policy: Policy) -> str:
+    """"private", "held" or "allowed": how `cwd` is classified for the `projects`
+    listing. private_cwd always wins, in every policy mode."""
+    if private_cwd(cwd):
+        return "private"
+    if policy.mode == "allowed" and not policy.allows(cwd):
+        return "held"
+    return "allowed"
+
+
 def text_key(text: str, attachments) -> str:
     normal = re.sub(r"\s+", " ", text or "").strip()
     names = sorted(json.dumps(a, sort_keys=True) for a in attachments or [])
@@ -270,17 +347,27 @@ class Run:
         self.redactions: collections.Counter = collections.Counter()
         self.files: collections.Counter = collections.Counter()
         self.unreadable: collections.Counter = collections.Counter()
+        self.held: collections.Counter = collections.Counter()  # held project folder (display path) -> sessions
 
     def exclude(self, host: str, reason: str, count: int = 1):
         self.excluded[host][reason] += count
 
+    def hold(self, cwd: str):
+        if isinstance(cwd, str) and cwd:
+            self.held[display_path(Path(cwd))] += 1
+
     def add(self, *, host, session, message, time, source, line, kind, text, attachments=None, context=None,
-            agent_text=""):
+            agent_text="", stance_override=None):
         found = collections.Counter()
         clean = redact(text, found)
         attachments = [{k: (redact(v, found) if isinstance(v, str) else v) for k, v in a.items() if v is not None}
                        for a in attachments or []]
-        judged = "unknown" if kind == "command" else stance(clean, agent_text)
+        if stance_override is not None:
+            judged = stance_override
+        elif kind == "command":
+            judged = "unknown"
+        else:
+            judged = stance(clean, agent_text)
         entry = {"id": f"{host}:{message}", "time": time, "host": host, "session": session, "message": message,
                  "source": source, "line": line, "kind": kind, "stance": judged, "text": clean}
         if attachments:
@@ -303,14 +390,59 @@ _APP_MARKERS = ("[Request interrupted by user", "[Request cancelled by user")
 _CLAUDE_EXCLUDE_PREFIX = (
     ("<scheduled-task", "scheduled_task"), ("<task-notification", "task_notification"),
     ("<agent-message", "agent_message"), ("<local-command-stdout", "command_output"),
-    ("<local-command-stderr", "command_output"), ("<bash-stdout", "command_output"),
-    ("<bash-stderr", "command_output"), ("<heartbeat", "heartbeat"),
+    ("<local-command-stderr", "command_output"), ("<heartbeat", "heartbeat"),
 )
 _COMMAND = re.compile(r"<command-name>(.*?)</command-name>", re.S)
 _COMMAND_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.S)
-_BASH_INPUT = re.compile(r"^\s*<bash-input>(.*?)</bash-input>\s*$", re.S)
+# A `!` shell run wraps the typed command in <bash-input>, and any output in <bash-stdout>/
+# <bash-stderr> -- in the same message or the next one. _BASH_OUTPUT is stripped from every
+# message wherever it appears (like _CLAUDE_STRIP) so output can never be kept as the user's
+# words; _BASH_INPUT then just needs to find the command, not anchor the whole message.
+_BASH_INPUT = re.compile(r"<bash-input>(.*?)</bash-input>", re.S)
+_BASH_OUTPUT = re.compile(r"<(bash-stdout|bash-stderr)\b[^>]*>.*?</\1>", re.S)
+# Claude Code marks a paste with <pasted_content id="...">...</pasted_content id="...">
+# (confirmed against real transcripts' structure); Codex has no equivalent marker.
+_CLAUDE_PASTE = re.compile(r"<pasted_content\b[^>]*>.*?</pasted_content\b[^>]*>", re.S)
 _IMAGE_SOURCE = re.compile(r"^\[Image: source: (.+)\]$")
 _REJECTION = re.compile(r"^The user doesn't want to proceed with this tool use\..*?the user said:\s*\n?(.*)$", re.S)
+
+
+def _paste_stance(text: str) -> str | None:
+    """"pasted" when the message is only pasted block(s) with nothing else typed around them,
+    "mixed" when typed text surrounds a paste, None when there's no paste to flag. A pasted
+    block is text the user didn't type, so it must never be judged "own"."""
+    if not _CLAUDE_PASTE.search(text):
+        return None
+    residual = _CLAUDE_PASTE.sub(" ", text)
+    return "mixed" if residual.strip() else "pasted"
+
+
+def _offered_labels(tool_input) -> dict[str, set[str]]:
+    """question text -> its offered option labels, from an AskUserQuestion tool_use's input."""
+    offered = {}
+    for question in (tool_input or {}).get("questions") or []:
+        if isinstance(question, dict) and isinstance(question.get("question"), str):
+            offered[question["question"]] = {option.get("label") for option in question.get("options") or []
+                                             if isinstance(option, dict) and isinstance(option.get("label"), str)}
+    return offered
+
+
+def _question_reply_stance(answers: dict, tool_input) -> str | None:
+    """A clicked option's answer is a label the agent wrote, not the user's words: force
+    "acceptance" when every answer matches an offered label, "mixed" when some do and some
+    look typed, and None (defer to the normal stance judging) when none match."""
+    offered = _offered_labels(tool_input)
+    clicked = total = 0
+    for question, answer in answers.items():
+        total += 1
+        labels = offered.get(question, set())
+        if isinstance(answer, str) and answer in labels:
+            clicked += 1
+        elif isinstance(answer, list) and answer and all(isinstance(a, str) and a in labels for a in answer):
+            clicked += 1
+    if clicked == 0:
+        return None
+    return "acceptance" if clicked == total else "mixed"
 
 
 def _claude_blocks(content):
@@ -339,7 +471,7 @@ def _assistant_text(record) -> str:
     return "\n\n".join(b.get("text") or "" for b in content or [] if isinstance(b, dict) and b.get("type") == "text").strip()
 
 
-def claude_session(path: Path, run: Run):
+def claude_session(path: Path, run: Run, policy: Policy):
     host = "claude"
     source = display_path(path)
     records = []
@@ -357,6 +489,13 @@ def claude_session(path: Path, run: Run):
         return
     if temp_cwd(start_cwd):
         run.exclude(host, "temporary_directory_session")
+        return
+    if private_cwd(start_cwd):
+        run.exclude(host, "private_project")
+        return
+    if policy.mode == "allowed" and not policy.allows(start_cwd):
+        run.exclude(host, "held_project")
+        run.hold(start_cwd)
         return
     run.files[host] += 1
     last = None          # preceding assistant message: dict(id, line, uuid, text)
@@ -405,13 +544,14 @@ def claude_session(path: Path, run: Run):
                 run.exclude(host, {"peer": "peer_message", None: "task_notification"}.get(origin, f"origin_{origin}"))
                 continue
             texts, attachments = _claude_blocks(attachment.get("prompt"))
-            text = "\n\n".join(t for t in (_CLAUDE_STRIP.sub("", t).strip("\n") for t in texts) if t.strip())
+            text = "\n\n".join(t for t in (_BASH_OUTPUT.sub("", _CLAUDE_STRIP.sub("", t)).strip("\n") for t in texts)
+                              if t.strip())
             if not time or not (text or attachments):
                 run.exclude(host, "empty_or_untimed")
                 continue
             run.add(host=host, session=session, message=record.get("uuid"), time=time, source=source, line=number,
                     kind="queued", text=text, attachments=attachments, context=context_from_last(),
-                    agent_text=last["text"] if last else "")
+                    agent_text=last["text"] if last else "", stance_override=_paste_stance(text))
             continue
         if kind != "user":
             continue
@@ -432,7 +572,8 @@ def claude_session(path: Path, run: Run):
                                            source=source, line=use[0], redactions=run.redactions)
                     run.add(host=host, session=session, message=record.get("uuid"), time=time, source=source,
                             line=number, kind="question_reply", text=text, context=context,
-                            agent_text="\n\n".join(questions))
+                            agent_text="\n\n".join(questions),
+                            stance_override=_question_reply_stance(answers, use[3]))
                     handled = True
                     break
                 body = block.get("content")
@@ -440,9 +581,11 @@ def claude_session(path: Path, run: Run):
                     body = "\n".join(b.get("text") or "" for b in body if isinstance(b, dict))
                 match = _REJECTION.match(body or "") if isinstance(body, str) else None
                 if match and match.group(1).strip():
+                    feedback = match.group(1).strip("\n")
                     run.add(host=host, session=session, message=record.get("uuid"), time=time, source=source,
-                            line=number, kind="rejection_feedback", text=match.group(1).strip("\n"),
-                            context=context_from_last(), agent_text=last["text"] if last else "")
+                            line=number, kind="rejection_feedback", text=feedback,
+                            context=context_from_last(), agent_text=last["text"] if last else "",
+                            stance_override=_paste_stance(feedback))
                     handled = True
                     break
             if not handled:
@@ -474,6 +617,10 @@ def claude_session(path: Path, run: Run):
             cleaned = _CLAUDE_STRIP.sub("", text)
             if cleaned != text:
                 run.stripped["claude_injected_context"] += 1
+            output_free = _BASH_OUTPUT.sub("", cleaned)
+            if output_free != cleaned:
+                run.stripped["claude_command_output"] += 1
+            cleaned = output_free
             if cleaned.strip():
                 kept.append(cleaned.strip("\n") if cleaned != text else cleaned)
         text = "\n\n".join(kept)
@@ -486,14 +633,15 @@ def claude_session(path: Path, run: Run):
             run.exclude(host, "app_generated")
             continue
         entry_kind = "message"
+        stance_override = _paste_stance(text)
         command = _COMMAND.search(text)
-        shell = _BASH_INPUT.match(text)
+        shell = _BASH_INPUT.search(text)
         if command and head.startswith(("<command-", "<command-message")):
             args = _COMMAND_ARGS.search(text)
             text = (command.group(1).strip() + " " + (args.group(1).strip() if args else "")).strip()
-            entry_kind = "command"
+            entry_kind, stance_override = "command", None
         elif shell:
-            text, entry_kind = shell.group(1), "shell"
+            text, entry_kind, stance_override = shell.group(1), "command", None
         if not text.strip() and not attachments:
             run.exclude(host, "injected_context")
             continue
@@ -502,17 +650,56 @@ def claude_session(path: Path, run: Run):
             continue
         entry = run.add(host=host, session=session, message=record.get("uuid"), time=time, source=source,
                         line=number, kind=entry_kind, text=text, attachments=attachments, context=context_from_last(),
-                        agent_text=last["text"] if last else "")
+                        agent_text=last["text"] if last else "", stance_override=stance_override)
         if record.get("promptId"):
             by_prompt[record["promptId"]] = entry
 
 
-def claude_sources(projects: Path, run: Run):
+def claude_sources(projects: Path, run: Run, policy: Policy):
     if not projects.is_dir():
         return
     for path in sorted(projects.glob("*/*.jsonl")):
-        claude_session(path, run)
+        claude_session(path, run, policy)
     run.exclude("claude", "subagent_transcript_files", sum(1 for _ in projects.glob("*/*/subagents/**/*.jsonl")))
+
+
+def _claude_head(path: Path) -> tuple[str | None, str | None]:
+    """(entrypoint, cwd) from a session's earliest records, stopping as soon as
+    both are known. Cheaper than a full parse; used by the `projects` listing,
+    which only needs to place each session in a folder, not read its content."""
+    entry_point = cwd = None
+    with path.open(encoding="utf-8", errors="replace") as handle:
+        for raw in handle:
+            if entry_point is not None and cwd is not None:
+                break
+            try:
+                record = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if entry_point is None and isinstance(record.get("entrypoint"), str):
+                entry_point = record["entrypoint"]
+            if cwd is None and isinstance(record.get("cwd"), str):
+                cwd = record["cwd"]
+    return entry_point, cwd
+
+
+def claude_project_status(projects: Path, policy: Policy, recorded: set[str], folders: dict):
+    """Populate `folders[display_path(cwd)]` with each Claude project's status and
+    session count, for the `projects` command. Mirrors claude_session's own
+    sdk/temp/private/held checks, but never reads message content."""
+    if not projects.is_dir():
+        return
+    for path in sorted(projects.glob("*/*.jsonl")):
+        entry_point, cwd = _claude_head(path)
+        if entry_point and entry_point.startswith("sdk"):
+            continue
+        if not isinstance(cwd, str) or not cwd or temp_cwd(cwd):
+            continue
+        status = folder_status(cwd, policy)
+        entry = folders.setdefault(display_path(Path(cwd)), {"status": status, "sessions": 0, "recorded_before": False})
+        entry["sessions"] += 1
+        if display_path(path) in recorded:
+            entry["recorded_before"] = True
 
 
 # --- Codex ----------------------------------------------------------------
@@ -635,7 +822,7 @@ def _codex_state(state_db: Path | None) -> set[str]:
         return set()
 
 
-def _codex_session_reason(meta: dict, archived: set[str]) -> str | None:
+def _codex_session_reason(meta: dict, archived: set[str], policy: Policy) -> str | None:
     source = meta.get("source")
     if meta.get("id") in archived:
         return "archived_thread"
@@ -652,10 +839,14 @@ def _codex_session_reason(meta: dict, archived: set[str]) -> str | None:
         return "other_source_threads"
     if temp_cwd(meta.get("cwd")):
         return "temporary_directory_threads"
+    if private_cwd(meta.get("cwd")):
+        return "private_project"
+    if policy.mode == "allowed" and not policy.allows(meta.get("cwd")):
+        return "held_project"
     return None
 
 
-def codex_sources(sessions: Path, state_db: Path | None, run: Run):
+def codex_sources(sessions: Path, state_db: Path | None, run: Run, policy: Policy):
     host = "codex"
     if not sessions.is_dir():
         return
@@ -679,9 +870,11 @@ def codex_sources(sessions: Path, state_db: Path | None, run: Run):
     family_keys: dict[str, list] = {}
     for thread_id, thread in sorted(threads.items(), key=lambda item: (item[1]["meta"].get("timestamp") or "", item[0])):
         meta = thread["meta"]
-        reason = _codex_session_reason(meta, archived)
+        reason = _codex_session_reason(meta, archived, policy)
         if reason:
             run.exclude(host, reason)
+            if reason == "held_project":
+                run.hold(meta.get("cwd"))
             continue
         run.files[host] += len(thread["segments"])
         agents = agent_messages.setdefault(thread_id, [])
@@ -788,6 +981,39 @@ def codex_sources(sessions: Path, state_db: Path | None, run: Run):
                             agent_text=agent_text)
 
 
+def codex_project_status(sessions: Path, archived: set[str], policy: Policy, recorded: set[str], folders: dict):
+    """Populate `folders[display_path(cwd)]` with each Codex project's status and
+    session count (one per thread), for the `projects` command. Mirrors
+    _codex_session_reason's own checks, but never reads message content."""
+    if not sessions.is_dir():
+        return
+    threads: dict[str, dict] = {}
+    for path in sorted(sessions.rglob("rollout-*.jsonl")):
+        try:
+            with path.open(encoding="utf-8", errors="replace") as handle:
+                meta = json.loads(handle.readline())
+        except (json.JSONDecodeError, OSError):
+            continue
+        if meta.get("type") != "session_meta":
+            continue
+        payload = meta.get("payload") or {}
+        thread = threads.setdefault(payload.get("id"), {"meta": payload, "sources": []})
+        thread["sources"].append(display_path(path))
+    for thread in threads.values():
+        meta = thread["meta"]
+        reason = _codex_session_reason(meta, archived, policy)
+        if reason not in (None, "private_project", "held_project"):
+            continue  # archived, subagent, exec, automation or temp: not a project to report
+        cwd = meta.get("cwd")
+        if not isinstance(cwd, str) or not cwd:
+            continue
+        status = {"private_project": "private", "held_project": "held"}.get(reason, "allowed")
+        entry = folders.setdefault(display_path(Path(cwd)), {"status": status, "sessions": 0, "recorded_before": False})
+        entry["sessions"] += 1
+        if any(source in recorded for source in thread["sources"]):
+            entry["recorded_before"] = True
+
+
 # --- Record files ----------------------------------------------------------
 
 def load_record(directory: Path) -> tuple[set, set, int]:
@@ -807,14 +1033,37 @@ def load_record(directory: Path) -> tuple[set, set, int]:
     return ids, copies, count
 
 
+def recorded_sources(directory: Path) -> set[str]:
+    """Every already-recorded entry's transcript `source`, cheaply, for the
+    `projects` command's "recorded-before-policy" status. Folder paths and
+    source paths only; never reads message text."""
+    sources = set()
+    if not directory.is_dir():
+        return sources
+    for path in sorted(directory.glob("*.jsonl")):
+        with path.open(encoding="utf-8") as handle:
+            for raw in handle:
+                if not raw.strip():
+                    continue
+                try:
+                    entry = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                source = entry.get("source")
+                if isinstance(source, str):
+                    sources.add(source)
+    return sources
+
+
 def append(args) -> dict:
     directory = args.root / "src" / "record"
+    policy = load_policy(args.root)  # malformed: raises before anything is read or written
     ids, copies, existing = load_record(directory)
     run = Run()
     if not args.no_claude:
-        claude_sources(args.claude_projects, run)
+        claude_sources(args.claude_projects, run, policy)
     if not args.no_codex:
-        codex_sources(args.codex_sessions, None if args.codex_state == Path("none") else args.codex_state, run)
+        codex_sources(args.codex_sessions, None if args.codex_state == Path("none") else args.codex_state, run, policy)
     run.entries.sort(key=lambda e: (e["time"], e["host"], e["source"], e["line"]))
     added, by_month = [], collections.defaultdict(list)
     skipped = collections.Counter()
@@ -849,6 +1098,7 @@ def append(args) -> dict:
         "added_by_month": {m: len(v) for m, v in sorted(by_month.items())},
         "skipped": dict(skipped),
         "excluded": {host: dict(sorted(c.items())) for host, c in sorted(run.excluded.items())},
+        "held_projects": dict(sorted(run.held.items())),
         "stripped": dict(sorted(run.stripped.items())),
         "redactions": dict(sorted(run.redactions.items())),
         "session_files_read": dict(run.files),
@@ -891,6 +1141,63 @@ def check(args) -> dict:
         problems.append(f"credential-like text remains: {dict(residual)}")
     return {"entries": count, "files": len(list(directory.glob('*.jsonl'))), "problems": problems[:50],
             "problem_count": len(problems)}
+
+
+# --- Recording policy: src/record/projects.json ----------------------------
+
+def list_projects(args) -> dict:
+    """Every project folder seen in the transcripts, its status ("allowed",
+    "held", "private" or "recorded-before-policy": held or private, but some
+    of its history was already recorded) and how many sessions were seen."""
+    policy = load_policy(args.root)  # malformed: raises and reports, like append
+    recorded = recorded_sources(args.root / "src" / "record")
+    archived = _codex_state(None if args.codex_state == Path("none") else args.codex_state)
+    folders: dict[str, dict] = {}
+    claude_project_status(args.claude_projects, policy, recorded, folders)
+    codex_project_status(args.codex_sessions, archived, policy, recorded, folders)
+    result = {}
+    for key, info in sorted(folders.items()):
+        status = info["status"]
+        if info["recorded_before"] and status in ("private", "held"):
+            status = "recorded-before-policy"
+        result[key] = {"status": status, "sessions": info["sessions"]}
+    return result
+
+
+def normalize_allowed(raw: str) -> str:
+    """A user-typed folder, in the same `~`-relative form the policy file and
+    `display_path` use elsewhere."""
+    return display_path(Path(raw).expanduser())
+
+
+def allow(args) -> dict:
+    """Add folders to src/record/projects.json's allowlist (creating it in
+    "allowed" mode if missing), or set {"record": "all"} with --all. Returns
+    the resulting policy."""
+    path = policy_path(args.root)
+    if args.all:
+        data = {"record": "all"}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        return data
+    if not args.paths:
+        raise ValueError("allow needs at least one path, or --all")
+    folders = []
+    if path.is_file():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"{path}: can't read projects.json ({error})") from None
+        if isinstance(existing, dict) and existing.get("record") == "allowed" and isinstance(existing.get("allowed"), list):
+            folders = [item for item in existing["allowed"] if isinstance(item, str) and item.strip()]
+    for raw in args.paths:
+        normal = normalize_allowed(raw)
+        if normal not in folders:
+            folders.append(normal)
+    data = {"record": "allowed", "allowed": folders}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return data
 
 
 # --- Answering model, used by tools/repeats.py ------------------------------
@@ -937,6 +1244,15 @@ def model_at(source: str, line: int, cache: dict, *, codex: bool) -> str:
     return found[0] if found else "unknown"
 
 
+def _add_source_args(sub: argparse.ArgumentParser, claude_dir: Path, codex_dir: Path) -> None:
+    sub.add_argument("--claude-projects", type=Path, default=claude_dir / "projects",
+                     help="Claude Code transcripts (default: projects/ in $CLAUDE_CONFIG_DIR, else ~/.claude)")
+    sub.add_argument("--codex-sessions", type=Path, default=codex_dir / "sessions",
+                     help="Codex transcripts (default: sessions/ in $CODEX_HOME, else ~/.codex)")
+    sub.add_argument("--codex-state", type=Path, default=codex_dir / "state_5.sqlite",
+                     help="Codex state database for archive flags; 'none' to skip")
+
+
 def parser() -> argparse.ArgumentParser:
     # Each host's own setting for its directory, else its default under the home directory.
     claude_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR") or HOME / ".claude")
@@ -945,16 +1261,17 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--root", type=Path, default=ROOT, help="Mnemorph repository root")
     commands = result.add_subparsers(dest="command", required=True)
     add = commands.add_parser("append", help="append new human-typed messages; prints counts only")
-    add.add_argument("--claude-projects", type=Path, default=claude_dir / "projects",
-                     help="Claude Code transcripts (default: projects/ in $CLAUDE_CONFIG_DIR, else ~/.claude)")
-    add.add_argument("--codex-sessions", type=Path, default=codex_dir / "sessions",
-                     help="Codex transcripts (default: sessions/ in $CODEX_HOME, else ~/.codex)")
-    add.add_argument("--codex-state", type=Path, default=codex_dir / "state_5.sqlite",
-                     help="Codex state database for archive flags; 'none' to skip")
+    _add_source_args(add, claude_dir, codex_dir)
     add.add_argument("--no-claude", action="store_true")
     add.add_argument("--no-codex", action="store_true")
     add.add_argument("--dry-run", action="store_true", help="report what would be added without writing")
     commands.add_parser("check", help="validate record files and scan them for unredacted credentials")
+    listing = commands.add_parser("projects", help="list project folders seen in transcripts, with recording status")
+    _add_source_args(listing, claude_dir, codex_dir)
+    allowing = commands.add_parser(
+        "allow", help='add folders to the recording allowlist in src/record/projects.json, or --all to record everything')
+    allowing.add_argument("paths", nargs="*", help="folders to allow (may use ~ for the home directory)")
+    allowing.add_argument("--all", action="store_true", help='set "record": "all", dropping the allowlist')
     return result
 
 
@@ -962,7 +1279,7 @@ def main(argv=None) -> int:
     args = parser().parse_args(argv)
     args.root = args.root.resolve()
     try:
-        output = {"append": append, "check": check}[args.command](args)
+        output = {"append": append, "check": check, "projects": list_projects, "allow": allow}[args.command](args)
     except (ValueError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

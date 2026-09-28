@@ -71,7 +71,7 @@ def load_record(root: Path) -> list[dict]:
 
 
 def is_work(entry: dict) -> bool:
-    return entry["kind"] not in ("question_reply", "goal", "command") and entry["stance"] != "acceptance"
+    return entry["kind"] not in ("question_reply", "goal", "command") and entry["stance"] not in ("acceptance", "pasted")
 
 
 def read_ledger(root: Path) -> list[dict]:

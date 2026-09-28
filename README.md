@@ -20,14 +20,14 @@ git clone https://github.com/builtin-pb/Mnemorph-Core.git my-mnemorph && cd my-m
 git remote rename origin upstream
 cp -R memory-template/. src/
 git add src && git commit -m "Start memory"
-python3 tools/push_guard.py install origin
+python3 tools/push_guard.py install
 ~~~
 
 Then:
 
 1. Link your copy into [Claude Code or Codex](integrations/README.md).
-2. To back up your memory, add a **private** repository as `origin` and push to it.
-3. Open a session and run `/personalize`.
+2. To back up your memory, create a **private** repository, add it as `origin`, run `python3 tools/push_guard.py install origin` so the push guard trusts it, and push.
+3. Open a session and run `/personalize`. It asks which of your projects Mnemorph may learn from ([Privacy](#privacy)).
 4. Schedule [nightly reflection](integrations/README.md#nightly-reflection), so Mnemorph learns from each day's work.
 
 ## Use it
@@ -55,7 +55,9 @@ git merge upstream/main                 # or cherry-pick only what you want
 
 ## Privacy
 
-Your memory lives in your instance. Push it only to a private repository. The push guard refuses to send anything outside Core's files to any remote you have not marked private. Keep secrets and credentials out of memory.
+To learn from your corrections, Mnemorph records what you type to Claude Code and Codex, but only in projects you allow. `/personalize` asks, and each nightly report lists new projects waiting for your answer; allow one with `python3 tools/record.py allow <folder>`. An empty `.mnemorph-private` file in a folder keeps that project out for good, such as an employer's or client's confidential work.
+
+Your memory lives in your instance. Push it only to a private repository. The push guard refuses to send any other remote a file outside Core or a commit a reviewer has not cleared. Keep secrets and credentials out of memory.
 
 ## Contributing
 
