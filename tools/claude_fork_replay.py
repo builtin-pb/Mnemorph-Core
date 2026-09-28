@@ -277,7 +277,7 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
             fidelity=common.fidelity(a, local, sessions, check), init=init or None, exit=code)
         print(f"{out}: claude exit {code}" + (f"; {len(bad)} contaminating reads" if bad else "")
               + f"; first {oriented['first_steps']} steps orienting: replay {oriented['replay_orienting']},"
-              f" original {oriented['original_orienting']}")
+              f" original {oriented['original_orienting']}" + common.cost_note(out))
         return code
     finally:
         if a.keep:

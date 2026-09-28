@@ -146,8 +146,9 @@ def seal(copy: Path, work: Path, prompt: str, root: Path, mnemorph: bool = True,
     """Point the run at its copy instead of the live checkout (common.seal_copy)
     and give it its own CODEX_HOME whose Mnemorph and skill links resolve to the
     copy, with the user's config and global AGENTS.md copied and auth linked
-    (never copied). Without mnemorph the home has no Mnemorph link or skills
-    (prepare() also removes the copy's AGENTS.md), for a bare-host arm;
+    (never copied). Without mnemorph the home has no Mnemorph link, skills or
+    AGENTS.md line naming Mnemorph (prepare() also removes the copy's
+    AGENTS.md), for a bare-host arm;
     global_agents is appended to the home's AGENTS.md.
     """
     prompt = common.seal_copy(copy, root, prompt, project, extra)
@@ -157,6 +158,12 @@ def seal(copy: Path, work: Path, prompt: str, root: Path, mnemorph: bool = True,
     for name in ("config.toml", "AGENTS.md"):
         if (real / name).is_file():
             shutil.copyfile(real / name, home / name)
+    agents = home / "AGENTS.md"
+    if not mnemorph and agents.is_file():
+        # the bare arm must not be told to load Mnemorph, as an installed instance's line does
+        kept = [line for line in agents.read_text(encoding="utf-8").splitlines(keepends=True)
+                if "mnemorph" not in line.lower()]
+        agents.write_text("".join(kept), encoding="utf-8")
     if (real / "auth.json").exists():
         os.symlink(real / "auth.json", home / "auth.json")
     if mnemorph:

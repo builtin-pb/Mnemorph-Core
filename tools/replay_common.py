@@ -920,6 +920,16 @@ def final_usage(events: Path) -> dict:
     return found or {"usage": None}
 
 
+def cost_note(out: Path) -> str:
+    """The whole run's list-price cost, helpers included. The manifest's
+    `usage` covers only the last message and understates it badly."""
+    try:
+        cost = json.loads((out / "manifest.json").read_text()).get("cost_usd")
+    except (OSError, ValueError):
+        return ""
+    return f"; about ${cost:.0f} at list prices, helpers included" if cost else ""
+
+
 def cli_version(binary: str, env: dict | None = None) -> str | None:
     try:
         r = subprocess.run([binary, "--version"], text=True, capture_output=True, env=env, timeout=60)

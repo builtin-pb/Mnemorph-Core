@@ -93,6 +93,8 @@ class SealedRun(ReplayCase):
     def test_bare_arm(self):
         extra = self.home / "simple.md"
         extra.write_text("Be autonomous.\n")
+        with (self.home / ".codex" / "AGENTS.md").open("a") as f:
+            f.write("Use the mnemorph skill on every task.\n")
         self.ok(self.replay("codex", *self.run_args("--no-mnemorph", "--global-agents", extra)))
         log = self.fake_log()
         self.assertNotIn("mnemorph", log["home"])

@@ -23,6 +23,7 @@
     }
   ],
   "files": {
+    "integrations/README.md": 6374,
     "src/core/__entry__.md": 5793,
     "src/core/learn/learn.md": 10500,
     "src/core/learn/mechanism-design.md": 8500,
@@ -35,6 +36,6 @@
     "src/core/taste/guard/charter.md": 7819,
     "src/core/taste/taste.md": 6400,
     "src/core/taste/theory.md": 7000,
-    "tools/README.md": 6330
+    "tools/README.md": 6430
   }
 }

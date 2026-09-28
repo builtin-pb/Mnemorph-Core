@@ -128,6 +128,34 @@ def history_refs(meta: dict) -> list[str]:
     return [i for i in (base.get("thread_id"), p.get("forked_from_id")) if isinstance(i, str) and i]
 
 
+def current_provider() -> str:
+    """The model provider the user's Codex config uses now. A session records
+    the provider it ran on, which may since have changed, and a fork would
+    otherwise inherit it, running on another account or service."""
+    import re
+    try:
+        text = (replay.user_home() / "config.toml").read_text(encoding="utf-8")
+    except OSError:
+        return "openai"
+    for line in text.splitlines():
+        if line.startswith("["):
+            break  # only the top-level setting
+        m = re.match(r'\s*model_provider\s*=\s*"([^"]+)"', line)
+        if m:
+            return m.group(1)
+    return "openai"
+
+
+def with_provider(raw: str, provider: str) -> str:
+    """A session_meta line with its recorded provider replaced by `provider`."""
+    e = parse(raw)
+    pl = e.get("payload") if isinstance(e.get("payload"), dict) else None
+    if e.get("type") != "session_meta" or pl is None or "model_provider" not in pl:
+        return raw.rstrip("\n")
+    pl["model_provider"] = provider
+    return json.dumps(e, ensure_ascii=False)
+
+
 def copy_ancestors(meta: dict, sessions: Path) -> list[str]:
     """Copy, unchanged, every rollout page the history depends on; returns their names.
 
@@ -145,7 +173,10 @@ def copy_ancestors(meta: dict, sessions: Path) -> list[str]:
             dest = sessions / f.relative_to(real)
             if not dest.exists():
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(f, dest)
+                with f.open(encoding="utf-8", errors="ignore") as src, dest.open("w", encoding="utf-8") as out:
+                    first = src.readline()
+                    out.write(with_provider(first, current_provider()) + "\n")
+                    shutil.copyfileobj(src, out)
                 copied.append(f.name)
             with f.open(encoding="utf-8", errors="ignore") as handle:
                 pending += history_refs(parse(handle.readline()))
@@ -173,6 +204,8 @@ def write_fork(lines: list[str], line: int, sid: str, cutoff: float, home: Path,
         if pl is not None:
             if e.get("type") == "session_meta":
                 pl["id"] = sid
+                if "model_provider" in pl:
+                    pl["model_provider"] = current_provider()
             if "cwd" in pl:  # fork runs where the session says it ran
                 pl["cwd"] = str(cwd)
             for key in ("workspace_roots", "runtime_workspace_roots"):

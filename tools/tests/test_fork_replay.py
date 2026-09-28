@@ -231,3 +231,16 @@ class ClaudeFork(ReplayCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProviderTests(unittest.TestCase):
+    def test_a_fork_runs_on_the_current_provider_not_the_recorded_one(self):
+        import importlib.util, json as _json
+        spec = importlib.util.spec_from_file_location(
+            "codex_fork_replay", Path(__file__).resolve().parents[1] / "codex_fork_replay.py")
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        line = _json.dumps({"type": "session_meta", "payload": {"id": "x", "model_provider": "crs"}})
+        self.assertEqual(_json.loads(m.with_provider(line, "openai"))["payload"]["model_provider"], "openai")
+        other = _json.dumps({"type": "event_msg", "payload": {}})
+        self.assertEqual(m.with_provider(other, "openai"), other)

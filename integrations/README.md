@@ -1,6 +1,6 @@
 # Host integrations
 
-These skills connect Claude Code and Codex to a Mnemorph instance. Each host skill finds `mnemorph` in the host's configuration directory, resolves that link to the instance's root and follows the shared text in [skills](skills/). Link your instance, not a bare copy of Mnemorph-Core: the skills read the instance's own Core and memory. Run the commands below from the instance's root; running them again is safe.
+These skills connect Claude Code and Codex to a Mnemorph instance. Each host skill finds `mnemorph` in the host's configuration directory, resolves that link to the instance's root and follows the shared text in [skills](skills/); [host particulars](hosts.md) records behaviour that affects delegation, logs and headless runs. Link your instance, not a bare copy of Mnemorph-Core: the skills read the instance's own Core and memory. Run the commands below from the instance's root; running them again is safe.
 
 ## Claude Code
 
@@ -25,12 +25,13 @@ CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
 mkdir -p "$CODEX_DIR/skills"
 ln -sfn "$PWD" "$CODEX_DIR/mnemorph"
 for skill in "$PWD"/integrations/codex/skills/*; do ln -sfn "$skill" "$CODEX_DIR/skills/$(basename "$skill")"; done
+grep -qxF 'Use the mnemorph skill on every task.' "$CODEX_DIR/AGENTS.md" 2>/dev/null || echo 'Use the mnemorph skill on every task.' >> "$CODEX_DIR/AGENTS.md"
 grep -q '^\[features\.multi_agent_v2\]' "$CODEX_DIR/config.toml" 2>/dev/null \
   && echo "Set max_concurrent_threads_per_session = 8 under [features.multi_agent_v2] in $CODEX_DIR/config.toml" \
   || printf '\n[features.multi_agent_v2]\nmax_concurrent_threads_per_session = 8\n' >> "$CODEX_DIR/config.toml"
 ~~~
 
-`$mnemorph` is configured for implicit use on every task; `$learn`, `$reflect` and `$personalize` can be selected when applicable, and `$taste` only when invoked. Codex allows four open agents per session by default, one fewer than `$taste` needs for the worker, a Guard and its three delegates; the last command raises the limit to eight, or names the line to add when the table already exists.
+The `AGENTS.md` line loads Mnemorph on every task; without it Codex skips the skill on requests it judges need no context, such as asking for an opinion. `$mnemorph` also allows implicit use; `$learn`, `$reflect` and `$personalize` can be selected when applicable, and `$taste` only when invoked. Codex allows four open agents per session by default, one fewer than `$taste` needs for the worker, a Guard and its three delegates; the last command raises the limit to eight, or names the line to add when the table already exists.
 
 ## Both hosts
 

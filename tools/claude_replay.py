@@ -245,7 +245,8 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
             root=str(root), commit=a.commit, mnemorph=not a.no_mnemorph,
             project={"path": str(live_project), "commit": a.project_commit} if project else None,
             fidelity=common.fidelity(a, local, sessions, check), init=init or None, exit=code)
-        print(f"{out}: claude exit {code}" + (f"; {len(reads)} outside reads, {len(bad)} contaminating" if reads else ""))
+        print(f"{out}: claude exit {code}" + (f"; {len(reads)} outside reads, {len(bad)} contaminating" if reads else "")
+              + common.cost_note(out))
         return code
     finally:
         if a.keep:
