@@ -281,6 +281,7 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
         if project:
             pairs.append((str(live_project), str(project)))
         write_fork(lines, line, sid, cutoff, home, cwd, pairs)
+        prompt = common.repoint(prompt, pairs)  # the replayed message names live files too ($skill links)
         pages = copy_ancestors(parse(lines[0]), home / "sessions")  # whole pages first: offsets point into them
         sessions = common.run_sessions(a, check, cutoff, env, claude_projects, home)
         if claude_projects.is_dir():

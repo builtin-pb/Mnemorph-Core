@@ -82,11 +82,12 @@ class CodexFork(ReplayCase):
         skill = self.home / ".codex" / "skills" / "taste" / "SKILL.md"
         target = self.rollout(sid, {"id": sid, "cwd": str(self.root)},
                               [self.message(f"read {self.root}/src/x.md, {skill} and {self.root}-Shared/y.md", 1),
-                               self.message("replay me", 2)])
+                               self.message(f"replay me with [$taste]({skill})", 2)])
         self.ok(self.replay("codex-fork", "--root", self.root, "--session", target, "--line", 3,
                             "--out", self.out))
         log = self.fake_log()
         copy = Path(log["cwd"])
+        self.assertEqual(log["prompt"], f"replay me with [$taste]({copy.parent / 'codex-home' / 'skills' / 'taste' / 'SKILL.md'})")
         text = "".join(t for t in log["sealed_codex"].values() if "read " in t)
         self.assertIn(f"{copy}/src/x.md", text)
         self.assertIn(str(copy.parent / "codex-home" / "skills" / "taste" / "SKILL.md"), text)
