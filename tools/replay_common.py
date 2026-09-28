@@ -525,7 +525,8 @@ def seal_copy(copy: Path, root: Path, prompt: str,
     """Point the run at its copy instead of the live checkout; return the prompt.
 
     Rewrites absolute paths to --root inside the copy (committed) and in the
-    prompt, copying any file the prompt names into the copy; the live
+    prompt, copying into the copy any file the prompt names that it lacks (a
+    tracked file keeps its version at the commit, not today's); the live
     --project path in the prompt becomes its clone. Each host then gives the run
     its own home whose Mnemorph and skill links resolve to the copy. The rest of
     the machine stays as it is, so the environment remains natural;
@@ -548,8 +549,8 @@ def seal_copy(copy: Path, root: Path, prompt: str,
         run(["git", "-C", str(copy), "commit", "-q", "-m", "Replay: point paths at this copy"])
     for m in set(re.findall(re.escape(live) + r"/[^\s)\]>\"']+", prompt)):
         src = Path(m)
-        if src.is_file():
-            target = copy / src.relative_to(root)
+        target = copy / src.relative_to(root)
+        if src.is_file() and not target.exists():  # a file the copy has keeps its version of the time
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src, target)
     prompt = pat.sub(lambda _: str(copy), prompt)

@@ -57,6 +57,16 @@ class SealedRun(ReplayCase):
         self.assertEqual(log["parent_vars"], [])
         self.assertFalse(copy.exists())  # removed without --keep
 
+    def test_a_named_file_keeps_its_version_of_the_time(self):
+        self.write(self.root / "note.md", "changed after the request\n")
+        self.write(self.root / "attached.txt", "an untracked attachment\n")
+        self.prompt.write_text(f"Please read {self.root}/note.md and {self.root}/attached.txt\n")
+        self.ok(self.replay("codex", *self.run_args()))
+        log = self.fake_log()
+        copy = Path(log["cwd"])
+        self.assertEqual(log["note"], f"See {copy}/src/x.md and {self.root}-Shared/y.md\n")
+        self.assertIn("attached.txt", log["cwd_files"])
+
     def test_outputs_and_manifest(self):
         r = self.ok(self.replay("codex", *self.run_args("--effort", "medium"),
                                 FAKE_READ=str(self.root / "later.md")))
