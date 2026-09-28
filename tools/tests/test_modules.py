@@ -1429,9 +1429,8 @@ class ModuleContracts(unittest.TestCase):
                 shutil.copytree(ROOT / "integrations", root / "integrations")
                 shutil.copytree(ROOT / "memory-template", root / "memory-template")
                 shutil.copytree(ROOT / "tools", root / "tools", ignore=shutil.ignore_patterns("__pycache__"))
-                shutil.copy2(ROOT / "AGENTS.md", root / "AGENTS.md")
-                shutil.copy2(ROOT / "README.md", root / "README.md")
-                shutil.copy2(ROOT / "memory-limits.json", root / "memory-limits.json")
+                for name in ("AGENTS.md", "README.md", "CONTRIBUTING.md", "LICENSE", "memory-limits.json"):
+                    shutil.copy2(ROOT / name, root / name)
                 subprocess.run(["git", "init", "-q", str(root)], check=True)
                 result = subprocess.run([sys.executable, str(root / "tools/modules.py"), "check"],
                                         capture_output=True, text=True)
