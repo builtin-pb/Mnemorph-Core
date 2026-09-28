@@ -77,6 +77,23 @@ class CodexFork(ReplayCase):
         self.assertEqual(log["prompt"], "replay me")
         self.assertEqual(json.loads((self.out / "replayed.json").read_text())["history_pages"].__len__(), 3)
 
+    def test_history_paths_point_at_the_sealed_copy(self):
+        sid = str(uuid.uuid4())
+        skill = self.home / ".codex" / "skills" / "taste" / "SKILL.md"
+        target = self.rollout(sid, {"id": sid, "cwd": str(self.root)},
+                              [self.message(f"read {self.root}/src/x.md, {skill} and {self.root}-Shared/y.md", 1),
+                               self.message("replay me", 2)])
+        self.ok(self.replay("codex-fork", "--root", self.root, "--session", target, "--line", 3,
+                            "--out", self.out))
+        log = self.fake_log()
+        copy = Path(log["cwd"])
+        text = "".join(t for t in log["sealed_codex"].values() if "read " in t)
+        self.assertIn(f"{copy}/src/x.md", text)
+        self.assertIn(str(copy.parent / "codex-home" / "skills" / "taste" / "SKILL.md"), text)
+        self.assertNotIn(f"{self.root}/src/x.md", text)
+        self.assertNotIn(str(skill), text)
+        self.assertIn(f"{self.root}-Shared/y.md", text)  # another checkout is not this one
+
     def test_record_line_and_id_resolve_to_the_message(self):
         ids = self.paginated()
         self.ok(self.replay("codex-fork", "--root", self.root, "--session", ids["target"], "--line", 6,

@@ -16,7 +16,8 @@ page of a paginated thread, `rollout-..._<segment>.jsonl`, or the thread it was
 forked from) and each `forked_from_id` thread, followed to the first page.
 
 The fork gets its own CODEX_HOME (the user's config copied, auth linked, skills
-and the Mnemorph link pointing at a copy of --root, default this repository, at
+and the Mnemorph link pointing at a copy of --root, live paths in the kept history
+repointed to the copy and the sealed home, default this repository, at
 the last commit before the replayed message, or --commit, with --patch applied).
 It works in that copy when the session ran in --root, in a clone of --project
 when it ran there, and otherwise in an empty directory; --cwd overrides (refused
@@ -190,8 +191,11 @@ def fork_command(out: Path, sid: str, a) -> list[str]:
     return cmd + replay.model_options(a) + [sid, "-"]
 
 
-def write_fork(lines: list[str], line: int, sid: str, cutoff: float, home: Path, cwd: Path) -> Path:
-    """The session up to the replayed message as a new rollout `sid`, set in `cwd`."""
+def write_fork(lines: list[str], line: int, sid: str, cutoff: float, home: Path, cwd: Path,
+               pairs: list[tuple[str, str]] = ()) -> Path:
+    """The session up to the replayed message as a new rollout `sid`, set in `cwd`,
+    with each live path in `pairs` repointed to its sealed stand-in: the history
+    names live files (skill paths, earlier commands), and Codex reads are not sandboxed."""
     day = dt.datetime.fromtimestamp(cutoff)
     sdir = home / "sessions" / f"{day:%Y}" / f"{day:%m}" / f"{day:%d}"
     sdir.mkdir(parents=True, exist_ok=True)
@@ -199,7 +203,7 @@ def write_fork(lines: list[str], line: int, sid: str, cutoff: float, home: Path,
     for raw in lines[:line - 1]:
         if not raw.strip():
             continue
-        e = json.loads(raw)
+        e = json.loads(common.repoint(raw, list(pairs)))
         pl = e.get("payload") if isinstance(e.get("payload"), dict) else None
         if pl is not None:
             if e.get("type") == "session_meta":
@@ -269,9 +273,15 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
         home = Path(env["CODEX_HOME"])
         cwd = common.fork_workdir(session_cwd(lines, line), [(live_project, project), (root, copy)],
                                   work, a.cwd, plain=not a.no_plain_paths)
-        write_fork(lines, line, sid, cutoff, home, cwd)
-        pages = copy_ancestors(parse(lines[0]), home / "sessions")  # whole pages first: offsets point into them
         claude_projects = work / "claude-config" / "projects"
+        live_home = replay.user_home()
+        pairs = [(str(root), str(copy)), (str(live_home / "mnemorph"), str(home / "mnemorph")),
+                 (str(live_home / "skills"), str(home / "skills")),
+                 *common.session_pairs(claude_projects, home)]
+        if project:
+            pairs.append((str(live_project), str(project)))
+        write_fork(lines, line, sid, cutoff, home, cwd, pairs)
+        pages = copy_ancestors(parse(lines[0]), home / "sessions")  # whole pages first: offsets point into them
         sessions = common.run_sessions(a, check, cutoff, env, claude_projects, home)
         if claude_projects.is_dir():
             env["CLAUDE_CONFIG_DIR"] = str(claude_projects.parent)
