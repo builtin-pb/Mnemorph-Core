@@ -28,6 +28,7 @@ Then:
 1. Link your copy into [Claude Code or Codex](integrations/README.md).
 2. To back up your memory, add a **private** repository as `origin` and push to it.
 3. Open a session and run `/personalize`.
+4. Schedule [nightly reflection](integrations/README.md#nightly-reflection), so Mnemorph learns from each day's work.
 
 ## Use it
 
