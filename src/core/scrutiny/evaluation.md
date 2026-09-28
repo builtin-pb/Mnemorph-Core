@@ -26,7 +26,7 @@ A product's own checks can pass while the outcome the user needs never arrives; 
 
 ## Human quality and next investment
 
-Do not assume an LLM judge reflects human taste; in this framework's development, model judges often did not. Prefer verifiable criteria grounded in trustworthy sources. Source and format checks and narrow human-grounded structural diagnostics do not validate overall readability and force, and more drafts cannot settle that gap or show benefit over an ordinary fresh agent. Do not rely on model imitation of human comprehension or aesthetics without demonstrated validity, including by the base model: model knowledge can hide human difficulty. Unvalidated verdicts are no evidence for those human-quality claims.
+Do not assume an LLM judge reflects human taste; model judges often do not. Prefer verifiable criteria grounded in trustworthy sources. Source and format checks and narrow human-grounded structural diagnostics do not validate overall readability and force, and more drafts cannot settle that gap or show benefit over an ordinary fresh agent. Do not rely on model imitation of human comprehension or aesthetics without demonstrated validity, including by the base model: model knowledge can hide human difficulty. Unvalidated verdicts are no evidence for those human-quality claims.
 
 A positive baseline should change allocation. Add capability prompts only to repair an observed ordinary-model weakness, since a generic prompt can worsen performance. When the ordinary model already meets the present need, stop redundant learning, or suspend it while checking a concrete criterion inadequacy. A met need must govern the next action, not merely qualify the report.
 

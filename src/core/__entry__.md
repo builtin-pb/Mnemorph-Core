@@ -15,8 +15,8 @@ Read and use [Taste](taste/taste.md) to guide production and judgment on every t
 
 ## Read by the question
 
-- [Taste](taste/README.md) explains the principles, the evidence that limits claims about them, and the Taste Guard.
-- [Learn](learn/README.md) explains how prompt writing, mechanism design, research and coordination serve an unfinished outcome. It distinguishes a useful component from completion and an instructed repair from autonomous development.
+- [Taste](taste/README.md) explains the principles and the Taste Guard.
+- [Learn](learn/README.md) explains how prompt writing, mechanism design, research and coordination serve an unfinished outcome, and why a useful component is not completion.
 - [Scrutiny](scrutiny/README.md) connects independent review, demanding construction and behavioral evidence. Its cases show why passing selected checks and producing fluent judgments can leave important defects intact.
 - [Memory](memory/README.md) explains coherent subject accounts, provenance and revisable retention. Intent, Context, Knowledge and Method are overlapping contributions within those accounts.
 

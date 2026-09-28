@@ -30,5 +30,3 @@ Keep obligations recoverable during other work and across interruptions. Integra
 After an interrupted action, inspect what actually happened before retrying. Avoid repeating an external effect solely because its acknowledgement is missing. Reconcile source and destination changes through [Memory](../memory/memory.md) before adopting another version.
 
 Ask for a human decision only when current authority or an important human-owned choice is missing. Carry already granted authority forward; a historical pause or approval in another account does not silently replace the user's current direction.
-
-A continuation episode, in development records that do not ship with Core, records why native handles and a usable account of unfinished work matter beyond a clean checkpoint.

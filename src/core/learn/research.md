@@ -27,4 +27,4 @@ Turn consequential uncertainty into an evidence question: what observation or co
 
 After material information arrives, revise the account and redirect the inquiry. End a bounded pass with useful knowledge, candidate directions or a sharper unresolved question. Stop searching when constructing or exercising an approach would resolve the uncertainty more usefully. Re-enter inquiry when later decisions expose new gaps.
 
-A goal-drift case in development records that do not ship with Core, and the [diagnostic-tool discussion](../scrutiny/evaluation.md), explain why source authority and a useful judge must be kept distinct from a convenient implementation or proxy.
+Keep source authority and a useful judge distinct from a convenient implementation or proxy; the [diagnostic-tool discussion](../scrutiny/evaluation.md) explains why.

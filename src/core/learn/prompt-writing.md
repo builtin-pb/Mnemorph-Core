@@ -60,7 +60,3 @@ Give scope and intent prominence over rationale and format. State rules before e
 Use sections for substantial distinct responsibilities; keep short prompts simple. Keep dependent conditions with their rule and search callers for duplicate authority.
 
 Put general behavior in the main prompt. Split support only when activation, reuse or revision repays navigation; callers must say when to use it and how its result changes work. Supply each prompt, tool, evaluator and handoff with needed inputs, authority and interfaces; define exact interfaces once and name who continues after partial or failed work.
-
-## Shaping experience
-
-These development records do not ship with Core. An ordinary-maintenance episode motivates whole-prompt inspection and justified repair. A writing case distinguishes a useful example from an unwanted template. Prompt-quality corrections explain why inspectability and explicit principles must survive simplification.

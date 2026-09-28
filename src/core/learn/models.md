@@ -1,6 +1,6 @@
 ---
 id: core.learn.models
-summary: Which model and effort does which work — judgment to the strongest available model, bounded checkable subtasks to cheaper ones, a stronger final check when a cheaper host owns open-ended work — with what agents can and cannot choose, and the evidence.
+summary: Which model and effort does which work — judgment to the strongest available model, bounded checkable subtasks to cheaper ones, a stronger final check when a cheaper host owns open-ended work — with what agents can and cannot choose.
 ---
 
 # Model routing
@@ -14,7 +14,7 @@ Choose the model and reasoning effort for each role by the judgment it needs and
 - **Final check on a cheaper host.** When a cheaper model owns open-ended work, have a stronger model compare the result with the request before it is reported done.
 - **Harder host.** Tests of whether a method carries a weaker model use one deliberately and say so.
 
-When a model misses judgment its instructions already require, route that judgment to a stronger model, or give it an operation with a checkable intermediate, rather than repeating the instruction. In one replayed import (one archive, one model), a written reading order made a cheaper model read a whole long source, yet only per-chunk fact notes made it record the events that mattered.
+When a model misses judgment its instructions already require, route that judgment to a stronger model, or give it an operation with a checkable intermediate, rather than repeating the instruction. In one replayed import, a written reading order made a cheaper model read a whole long source, yet only per-chunk fact notes made it record the events that mattered.
 
 Vendors release models every few weeks; recheck which available model and price fit each role when a new model appears.
 
@@ -25,7 +25,3 @@ Models differ in habit as well as strength. One may keep to a request's literal 
 ## What agents can choose
 
 Agents choose models only for work they launch: subagents, Guard delegates, `codex exec` runs and experiments. The main session, scheduled tasks and Codex automations take model and effort from app settings that only the user controls; a scheduled reflection, if configured, runs on the host's default, which may be weaker or lower in effort than its judgment needs. Report such a mismatch with these roles to the user rather than working around it. Whether Codex subagents can run a different model is unchecked.
-
-## Evidence and limits
-
-These observations come from development records that do not ship with Core. Audited repeats of corrections after a recorded rule were several times more frequent on a cheaper model than on stronger ones, in samples confounded with date, task and effort. In one user's record over about three weeks, seven of twelve recorded correction kinds recurred after recording, across models. A cheaper model sampled a long source and called an import finished despite an explicit review instruction; a stronger model made the accepted repair. Replaying that import three times per arm, [Personalize](../memory/personalize.md) raised the cheaper model's reading of the source's recent year from 8–47% to 100%, but it recorded all three missed events in no run; adding per-chunk fact notes did so in all three. These tiers are provisional until repeated corrections are counted under them.

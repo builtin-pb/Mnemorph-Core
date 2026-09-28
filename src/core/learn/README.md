@@ -1,7 +1,7 @@
 ---
 id: core.learn.overview
 role: reference
-summary: Understand developing prompts, workflows and capabilities, Learn's subroutines and supports, and the limits of the retained evidence.
+summary: Understand developing prompts, workflows and capabilities, Learn's subroutines and supports.
 ---
 
 # Learn
@@ -19,12 +19,3 @@ Prompt Writing and Mechanism Design are Learn's subroutines; Research and Coordi
 - [Research](research.md) develops knowledge and alternatives when the current account may omit a relevant fact or approach.
 - [Coordination](coordination.md) carries ownership, dependencies and live effects across delegation, interruption and source changes.
 - [Model routing](models.md) matches judgment and checkable subtasks to models.
-
-## Evidence and open limits
-
-The development records below do not ship with Core; their findings are reported, not checkable here.
-
-- A prompt-quality record lists human requirements for Learn and prompts and why checking the whole prompt differs from rewriting all of it. A maintenance study records ordinary edits that added requested behavior while keeping tangled prose; cleanup-cued success did not predict ordinary maintenance.
-- A progress record keeps why an earlier cadence guarded against neglected inquiry and reconsideration, and cases where a weakened target, finite success or local repair missed the outcome. A construction record keeps concrete operations and assistance boundaries; a supplied insight can demonstrate a technique while leaving its discovery unresolved. Evolving-work cases exercise coordination decisions; hypothetical decisions establish neither real tool execution nor recovery.
-- In a repair-selection study both treatments repaired the artifact, with no shown advantage for added judgment guidance. Elaborate instructions have not established self-directed selection of the intervention an unfamiliar task needs.
-- A feedback record keeps proposed observations separate from demonstrated gains. Public-practice and feedback-transfer studies found that public contrasts helped some judgments, but new-case regressions rejected the learned judges and no general prompt advantage was established. A public-practice validation retains executable gains, bounded by strong ordinary performance, a missed parser defect, failed writing transfer and contaminated discovery. Retention does not activate instructions.
