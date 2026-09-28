@@ -120,6 +120,16 @@ class PublishCoreTests(unittest.TestCase):
         self.assertIn("does not apply on public Core", r.stdout)
         self.assertEqual(self.public_log(), ["Public change", "Seed Core"])
 
+    def test_a_rerun_reuses_recorded_verdicts(self):
+        commit(self.private, "tools/a.py", "a = 5\n", "Change a")
+        counter = self.private.parent / "reviews"
+        env_reviewer = ENV["MNEMORPH_PUBLISH_REVIEWER"]
+        ENV["MNEMORPH_PUBLISH_REVIEWER"] = f"echo x >> {counter}; " + env_reviewer
+        self.addCleanup(ENV.__setitem__, "MNEMORPH_PUBLISH_REVIEWER", env_reviewer)
+        self.assertEqual(self.run_publish("run", "--dry-run").returncode, 0)
+        self.assertEqual(self.run_publish("run", "--dry-run").returncode, 0)
+        self.assertEqual(counter.read_text().count("x"), 1)
+
     def test_dry_run_reviews_without_pushing(self):
         commit(self.private, "tools/a.py", "a = 4\n", "Change a")
         r = self.run_publish("run", "--dry-run")

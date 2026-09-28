@@ -69,8 +69,10 @@ class Stop(Exception):
     """A condition that ends the run and deserves one notification."""
 
 
-def git(*args: str, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess:
-    r = subprocess.run(["git", *args], cwd=cwd, text=True, capture_output=True)
+def git(*args: str, cwd: Path | None = None, check: bool = True,
+        env: dict | None = None) -> subprocess.CompletedProcess:
+    r = subprocess.run(["git", *args], cwd=cwd, text=True, capture_output=True,
+                       env=None if env is None else {**os.environ, **env})
     if check and r.returncode:
         raise RuntimeError(f"git {' '.join(args)}: {r.stderr.strip() or r.stdout.strip()}")
     return r
@@ -197,7 +199,8 @@ def review(commit: str, wt: Path, args: argparse.Namespace) -> dict:
 def replay(shas: list[str], base: str, wt: Path) -> str | None:
     """Commit the Core part of `shas` on `base` as one commit (the original's
     message for one); None if together they change nothing. Raises Stop on a
-    conflict."""
+    conflict. Dates come from the last original, so replaying the same content
+    on the same base yields the same commit and reuses its recorded verdict."""
     git("checkout", "-q", "--force", "--detach", base, cwd=wt)
     for sha in shas:
         patch = git("diff", "--binary", f"{sha}^", sha, "--", *core_paths(sha)).stdout
@@ -209,12 +212,14 @@ def replay(shas: list[str], base: str, wt: Path) -> str | None:
                        f"instance, resolve, and commit the Core fix")
     if not git("diff", "--cached", "--quiet", cwd=wt, check=False).returncode:
         return None
+    dates = {"GIT_AUTHOR_DATE": out("log", "-1", "--format=%aI", shas[-1]),
+             "GIT_COMMITTER_DATE": out("log", "-1", "--format=%cI", shas[-1])}
     if len(shas) == 1:
-        git("commit", "-q", "-C", shas[0], cwd=wt)
+        git("commit", "-q", "-C", shas[0], cwd=wt, env=dates)
     else:
         subjects = "\n".join(f"- {out('log', '-1', '--format=%s', s)}" for s in shas)
         git("commit", "-q", "--author", out("log", "-1", "--format=%an <%ae>", shas[-1]),
-            "-m", f"Publish {len(shas)} instance commits together\n\n{subjects}", cwd=wt)
+            "-m", f"Publish {len(shas)} instance commits together\n\n{subjects}", cwd=wt, env=dates)
     return out("rev-parse", "HEAD", cwd=wt)
 
 
