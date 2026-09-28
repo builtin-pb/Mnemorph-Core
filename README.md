@@ -36,7 +36,7 @@ Mnemorph loads on every task without being asked. Work as usual, and when your a
 | Command | When to use it |
 | --- | --- |
 | `/personalize` | First, and whenever you have new material. It reads what you offer, such as agent histories, documents, and chat or mail exports, and writes an account of your life and work, so you stop repeating yourself. |
-| `/reflect` | After a session worth learning from, or on a schedule. It files what you said where it belongs and revises or forgets what has gone stale. |
+| `/reflect` | After a session worth learning from; the nightly run does the same for each day. It files what you said where it belongs and revises or forgets what has gone stale. |
 | `/learn` | To build or improve a prompt, a workflow or a capability, Mnemorph's own included. |
 | `/taste` | On work that matters. It starts a Taste Guard, an independent agent that asks *whether* and *why* one level above the work, up to whether the whole project should change course. |
 

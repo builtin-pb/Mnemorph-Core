@@ -28,3 +28,27 @@ for skill in "$PWD"/integrations/codex/skills/*; do ln -s "$skill" "$CODEX_DIR/s
 ## Both hosts
 
 `$taste` or `/taste` starts a Guard whose independent inquiry may range beyond the worker's immediate task but ends with the active worker run; the worker launches fresh Guards as needed and stops them before finishing. Reflect defaults to the present session unless the user explicitly requests others. The active project remains the task context; reflection and Personalize write memory in the instance. [record.py](../tools/record.py) reads each host's transcripts from the same configuration directories.
+
+## Nightly reflection
+
+A nightly run reflects on the day's sessions, files the notes agents took of what you said, and revises memory, so Mnemorph keeps learning without being asked. Schedule it once:
+
+- **Claude Code:** in the Claude desktop app, open a session in your instance, paste the launcher below and ask Claude to run it every night, say at 2:00. Give the task your instance's folder and a permission mode that runs unattended, such as auto; in Manual mode a run waits at its first command for your approval. Auto mode allows the steps the launcher authorizes, so keep that list.
+- **Codex:** create an automation with the same launcher in your instance's folder.
+
+Replace `<instance>` with your instance's path:
+
+~~~text
+Run Mnemorph's periodic reflection in <instance>: use the reflect skill and follow `src/core/memory/periodic-reflection.md`.
+
+- Cursor: `.mnemorph-local/nightly-reflection/cursor.json`. If it is missing, create it and cover the past day.
+- Sources: Claude Code sessions under `~/.claude/projects/`, Codex sessions under `~/.codex/sessions/`, and any ChatGPT data export in `~/Downloads/` newer than the cursor's last export.
+- Time bound: 2 hours.
+
+I authorize these steps on every run, where that procedure calls for them:
+- Commit on `main` and push it to `origin` with a plain `git push`. Never push to `upstream`, and never push a nightly branch.
+- For a core-prompt change, create the worktree `../mnemorph-nightly-<date>` on branch `nightly/<date>`, commit there, then remove the worktree with `git worktree remove`.
+- In `src/inbox.md`, delete exactly the notes this run filed or dropped, leaving any note added after you read the file.
+~~~
+
+Each run ends with a report of what it kept, revised and forgot. A change to a core prompt waits on its `nightly/<date>` branch; read its diff and `git merge` it to adopt it.
