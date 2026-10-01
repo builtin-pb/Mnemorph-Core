@@ -21,7 +21,9 @@ Choose the rule, demonstration, interface or activation route the consumer will 
 
 ### Challenge
 
-When a natural-language rule has a consequentially uncertain boundary, calibrate it with contrasting examples of what counts, what does not, and plausible near misses or valid alternatives. Explain the decision each should produce and why; use those distinctions to revise the general rule. Then try fresh uncued ordinary requests on both sides, beyond the calibration examples. Put examples in the prompt only when they help its consumer make the intended decision; titles, defaults, order and examples can narrow a broad rule. Compare different structures or scopes when word changes share the bias.
+When a natural-language rule has a consequentially uncertain boundary, calibrate it with contrasting examples of what counts, what does not, and plausible near misses or valid alternatives. Explain the decision each should produce and why; use those distinctions to revise the general rule. Choose contrasts that separate the intended reading from a plausible wrong one. For example, a concrete rule versus a vague slogan does not calibrate when that rule applies: include a nearby situation where the reason no longer supports the same action. When using real cases, preserve the source’s actual scope. An explicitly local preference cannot support a broader default by itself.
+
+Then try fresh uncued ordinary requests on both sides, beyond the calibration examples. Put examples in the prompt only when they help its consumer make the intended decision; titles, defaults, order and examples can narrow a broad rule. Compare different structures or scopes when word changes share the bias.
 
 Challenge additions with a strong countercase and simpler arrangement. Check prohibitions, exceptions, example templates and unused outputs. Look for omitted useful behavior.
 

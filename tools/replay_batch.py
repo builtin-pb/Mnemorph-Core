@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 """Run a batch of agent replays safely: one canary first, then bounded fan-out.
 
-Each line of the jobs file is `ID ARGS...`: the arguments for one
-`replay.py TOOL` run (--tool codex, codex-fork, claude or claude-fork; default codex) without
---out, which becomes OUT/ID. Each job goes through replay.py, so an installed
-copy's refusals apply to it; --runner (another script) works only from a
-checkout. The batch:
+Each line of the jobs file is `ID [TOOL] ARGS...`: the arguments for one
+`replay.py TOOL` run (TOOL codex, codex-fork, claude or claude-fork, else --tool,
+default codex) without --out, which becomes OUT/ID. Each job goes through
+replay.py, so an installed copy's refusals apply to it; --runner (another
+script) works only from a checkout. The batch:
 
+- first has a fresh Codex agent review the design ([case_review.md](case_review.md):
+  Taste's experiment checkpoint, and whether each case can show the claimed
+  difference through its standard, setting and contrast): given --plan and the
+  jobs, it writes OUT/review.md and the batch stops. Read it, revise or drop what it
+  finds unsound, and rerun with --reviewed OUT/review.md; a review counts only
+  for the plan and jobs it read, so a changed plan or job list is reviewed
+  again. The author's own check is not enough: a batch judged from inside its
+  plan can score cases that cannot show the effect;
 - skips IDs whose OUT/ID/last.md already exists (resumable);
 - runs the first remaining job alone and stops unless it exits 0 with a
   non-empty reply and an empty contaminated.json (so a broken or leaking
@@ -24,6 +32,7 @@ Watch it with `tail -n 0 -F OUT/status.jsonl`. Standard library only.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shlex
 import subprocess
@@ -62,6 +71,30 @@ def run_job(runner: list[str], out: Path, jid: str, args: list[str]) -> dict:
             "error": "" if ok else (r.stderr or r.stdout)[-300:]}
 
 
+REVIEWER = ("gpt-6-astra", "high")
+
+
+def review_key(plan: Path, jobs: Path) -> str:
+    return hashlib.sha256(plan.read_bytes() + b"\0" + jobs.read_bytes()).hexdigest()[:16]
+
+
+def review(plan: Path, jobs: Path, out: Path, key: str) -> Path:
+    """Have a fresh, read-only Codex agent review the design; return OUT/review.md."""
+    brief = (TOOLS / "case_review.md").read_text(encoding="utf-8")
+    prompt = (f"{brief}\n\n## Plan ({plan})\n\n{plan.read_text(encoding='utf-8')}\n\n"
+              f"## Jobs ({jobs})\n\n{jobs.read_text(encoding='utf-8')}")
+    raw = out / "review-raw.md"
+    model, effort = REVIEWER
+    subprocess.run(["codex", "exec", "--ephemeral", "-s", "read-only", "--skip-git-repo-check",
+                    "-C", str(TOOLS.parent), "-m", model, "-c", f'model_reasoning_effort="{effort}"',
+                    "-o", str(raw), "-"], input=prompt, text=True, capture_output=True)
+    text = raw.read_text(encoding="utf-8") if raw.exists() else "(the reviewer returned nothing)"
+    path = out / "review.md"
+    path.write_text(f"review-key: {key}\nplan: {plan}\njobs: {jobs}\nreviewer: {model} {effort}\n\n{text}\n",
+                    encoding="utf-8")
+    return path
+
+
 def main(argv: list[str] | None = None, prog: str | None = None) -> int:
     ap = argparse.ArgumentParser(prog=prog, description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -74,20 +107,32 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
     ap.add_argument("--max-failures", type=int, default=3,
                     help="stop launching after this many consecutive failures")
     ap.add_argument("--heartbeat", type=int, default=600, help="seconds between heartbeat lines")
+    ap.add_argument("--plan", required=True, help="the design the reviewer reads: claim, arms, cases, predictions")
+    ap.add_argument("--reviewed", help="OUT/review.md from an earlier call, once acted on")
     a = ap.parse_args(argv)
     common.guard(ap, a, None)
 
     out = Path(a.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     status = out / "status.jsonl"
-    runner = ([sys.executable, str(Path(a.runner).resolve())] if a.runner
-              else [sys.executable, str(TOOLS / "replay.py"), a.tool])
+    plan, jobs_file = Path(a.plan).resolve(), Path(a.jobs).resolve()
+    key = review_key(plan, jobs_file)
+    seen = Path(a.reviewed).read_text(encoding="utf-8") if a.reviewed and Path(a.reviewed).exists() else ""
+    if f"review-key: {key}" not in seen.splitlines()[:1]:
+        path = review(plan, jobs_file, out, key)
+        log(status, {"event": "reviewed", "review": str(path),
+                     "note": "read it, revise or drop what it finds unsound, then rerun with --reviewed "
+                             + str(path) + ("; the plan or jobs changed since the review given" if seen else "")})
+        return 3
+    base = [sys.executable, str(Path(a.runner).resolve())] if a.runner else [sys.executable, str(TOOLS / "replay.py")]
     jobs = []
-    for line in Path(a.jobs).read_text(encoding="utf-8").splitlines():
+    for line in jobs_file.read_text(encoding="utf-8").splitlines():
         if line.strip() and not line.lstrip().startswith("#"):
             jid, *args = shlex.split(line)
+            tool = args.pop(0) if args and args[0] in TOOL_NAMES else a.tool
             if not (out / jid / "last.md").exists():
-                jobs.append((jid, args))
+                jobs.append((jid, args if a.runner else [tool, *args]))
+    runner = base
     counts = {"ok": 0, "failed": 0, "contaminated": 0, "skipped": 0}
     if not jobs:
         log(status, {"event": "done", **counts, "note": "nothing to run"})

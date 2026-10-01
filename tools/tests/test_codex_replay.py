@@ -15,7 +15,8 @@ from replay_fakes import ReplayCase  # noqa: E402
 class DryRun(ReplayCase):
     def test_command_disables_outside_access(self):
         out = self.ok(self.replay("codex", *self.run_args("--dry-run"))).stdout
-        for flag in ("-s workspace-write", 'approval_policy="never"',
+        for flag in ('default_permissions="replay_sealed"', 'permissions.replay_sealed.extends=":workspace"',
+                     f'"{self.root}" = "deny"', 'approval_policy="never"',
                      "--disable apps", "--disable plugins", "--disable computer_use",
                      "--disable browser_use", "--disable in_app_browser",
                      "exclude_slash_tmp=true", "exclude_tmpdir_env_var=true",
@@ -66,6 +67,11 @@ class SealedRun(ReplayCase):
         copy = Path(log["cwd"])
         self.assertEqual(log["note"], f"See {copy}/src/x.md and {self.root}-Shared/y.md\n")
         self.assertIn("attached.txt", log["cwd_files"])
+
+    def test_refuses_to_run_when_live_reads_are_not_denied(self):
+        r = self.replay("codex", *self.run_args(), FAKE_SANDBOX_READS="1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("read-deny failed", r.stderr + r.stdout)
 
     def test_outputs_and_manifest(self):
         r = self.ok(self.replay("codex", *self.run_args("--effort", "medium"),

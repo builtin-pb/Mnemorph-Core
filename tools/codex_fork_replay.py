@@ -184,9 +184,9 @@ def copy_ancestors(meta: dict, sessions: Path) -> list[str]:
     return copied
 
 
-def fork_command(out: Path, sid: str, a) -> list[str]:
+def fork_command(out: Path, sid: str, a, deny: list[str] = ()) -> list[str]:
     cmd = ["codex", "exec", "fork", "--json", "-o", str(out / "last.md"),
-           "-c", 'sandbox_mode="workspace-write"', *replay.isolation_options(),
+           *([] if deny else ["-c", 'sandbox_mode="workspace-write"']), *replay.isolation_options(deny),
            "--skip-git-repo-check"]
     return cmd + replay.model_options(a) + [sid, "-"]
 
@@ -258,10 +258,12 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
     out = Path(a.out).resolve()
     sid = str(uuid.uuid4())
     if a.dry_run:
-        print(shlex.join(fork_command(out, sid, a)), f"< line {line} of {session}")
+        print(shlex.join(fork_command(out, sid, a, replay.live_paths(root, live_project))),
+              f"< line {line} of {session}")
         print(replay_check.summary(check))
         print(common.fidelity_note(a, check))
         return 0
+    replay.check_denial(replay.live_paths(root, live_project))
     out.mkdir(parents=True, exist_ok=True)
     common.save_check(out, check)
     started = time.time()
@@ -286,7 +288,7 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
         sessions = common.run_sessions(a, check, cutoff, env, claude_projects, home)
         if claude_projects.is_dir():
             env["CLAUDE_CONFIG_DIR"] = str(claude_projects.parent)
-        cmd = fork_command(out, sid, a)
+        cmd = fork_command(out, sid, a, replay.live_paths(root, live_project))
         changes = common.Changes(work, copy, cwd, a.project_dir, local=root if local is not None else None)
         code = common.run_watched(cmd, prompt, env, out, a.idle_limit, cwd=cwd)
         changes.write(out)

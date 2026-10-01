@@ -27,7 +27,7 @@ TOOLS = Path(__file__).resolve().parent
 MARKER = TOOLS / "installed.json"  # written by `replay.py install`
 FILES = ("replay.py", "replay_common.py", "codex_replay.py", "codex_fork_replay.py",
          "claude_replay.py", "claude_fork_replay.py", "replay_batch.py", "replay_check.py",
-         "replay_judge.md")
+         "replay_judge.md", "case_review.md")
 # Variables the launching agent sets for its own session; a replay starts clean.
 PARENT_AGENT = re.compile(r"^(CLAUDE|ANTHROPIC)|^(AI_AGENT|BAGGAGE)$")
 # Left out of changes.diff: dependency trees and bytecode (plus --project-dir copies).
@@ -259,9 +259,14 @@ def layout(work: Path, root: Path, project: str | None) -> tuple[Path, Path | No
 
 
 def clone(src: Path, dest: Path, commit: str) -> None:
-    run(["git", "clone", "-q", str(src), str(dest)])
+    # Fetch only the selected history: a local clone also copies later objects,
+    # which can expose corrections even after checking out an earlier commit.
+    commit = git_out(src, "rev-parse", "--verify", "--end-of-options", f"{commit}^{{commit}}")
+    object_format = git_out(src, "rev-parse", "--show-object-format")
+    run(["git", "init", "-q", f"--object-format={object_format}", str(dest)])
+    run(["git", "-C", str(dest), "fetch", "-q", "--no-tags", "--update-shallow",
+         "--no-recurse-submodules", str(src), commit])
     run(["git", "-C", str(dest), "checkout", "-q", "-B", "main", commit])
-    run(["git", "-C", str(dest), "remote", "remove", "origin"])
 
 
 def commit_patch(repo: Path, patch: str, message: str) -> None:
@@ -591,7 +596,8 @@ def run_watched(cmd: list[str], prompt: str, env: dict | None, out: Path, idle: 
                     return 124
 
 
-def snapshot(tree: Path, index: Path, exclude: list[str] = (), git_dir: Path | None = None) -> str:
+def snapshot(tree: Path, index: Path, exclude: list[str] = (), git_dir: Path | None = None,
+             notes: list[str] | None = None) -> str:
     """A Git tree of `tree`'s working files, committed or not and ignored ones
     included (minus NOISE and `exclude`), written through a private index so the
     repository's own index and HEAD stay as the run left them. A directory
@@ -603,8 +609,17 @@ def snapshot(tree: Path, index: Path, exclude: list[str] = (), git_dir: Path | N
     if git_dir:
         env.update(GIT_DIR=str(git_dir), GIT_WORK_TREE=str(tree))
     specs = [".", *NOISE, *(f":(exclude){d}" for d in exclude)]
-    subprocess.run(["git", "-C", str(tree), "add", "-A", "-f", "--", *specs],
-                   env=env, capture_output=True)
+    for _ in range(20):  # a repository the run created without a commit aborts `git add`
+        r = subprocess.run(["git", "-C", str(tree), "add", "-A", "-f", "--", *specs],
+                           env=env, capture_output=True, text=True)
+        empty = re.findall(r"error: '([^']+)' does not have a commit checked out", r.stderr)
+        if r.returncode == 0 or not empty:
+            break
+        specs += [f":(exclude){p.rstrip('/')}" for p in empty]
+        if notes is not None:
+            notes += [f"not captured: {p} (a Git repository without a commit)" for p in empty]
+    if r.returncode != 0 and notes is not None:
+        notes.append(f"git add failed; this capture may be incomplete: {r.stderr.strip()[:500]}")
     return subprocess.run(["git", "-C", str(tree), "write-tree"], env=env,
                           text=True, capture_output=True).stdout.strip()
 
@@ -643,7 +658,8 @@ class Changes:
 
     def snap(self, tree: Path, when: str) -> str:
         skip = (self.exclude if tree == self.workdir else []) + ([LOCAL] if self.local and tree == self.copy else [])
-        return snapshot(tree, self.work / f"index-{tree.name}-{when}", skip, self.git_dirs.get(tree))
+        return snapshot(tree, self.work / f"index-{tree.name}-{when}", skip, self.git_dirs.get(tree),
+                        self.__dict__.setdefault("notes", []))
 
     def write(self, out: Path) -> None:
         for tree, name in self.names.items():
@@ -652,6 +668,8 @@ class Changes:
                 diff += local_diff(self.copy, self.local[0], self.local[1])
             diff = diff.replace(str(self.copy), "<copy>" if name == "changes.diff" else "<mnemorph>")
             (out / name).write_text(diff.replace(str(self.work), "<work>"), encoding="utf-8")
+        if getattr(self, "notes", None):
+            (out / "capture-notes.txt").write_text("\n".join(dict.fromkeys(self.notes)) + "\n", encoding="utf-8")
 
 
 # -- forks: one turn of a real session at its real distance -----------------

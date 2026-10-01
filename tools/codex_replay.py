@@ -24,8 +24,13 @@ run links the user's Codex login and copies the global config into its own
 home, so trust entries stay there. With --no-seal the run uses ~/.codex itself
 and each copy adds a trusted-project entry to ~/.codex/config.toml; run
 `--prune-trust` once after such a batch (not while runs are live, since Codex
-rewrites that file). An installed copy refuses both. Reads are not sandboxed;
-exclude runs whose contaminated.json is non-empty. Standard library only; needs
+rewrites that file). An installed copy refuses both. A sealed run's commands
+cannot read the live checkout, its sibling Mnemorph checkouts, the project or the
+hosts' live sessions, skills and Mnemorph links (live_paths(): a permissions
+profile in place of `-s workspace-write`, checked before each run, since
+rewriting paths alone never sealed a run); its permission instructions list the
+denied paths. Other reads are still open; exclude runs whose contaminated.json is
+non-empty. Standard library only; needs
 the `codex` CLI.
 """
 
@@ -92,8 +97,41 @@ def model_options(a) -> list[str]:
     return cmd
 
 
-def isolation_options() -> list[str]:
+def live_paths(root: Path | None, project: Path | None = None) -> list[str]:
+    """What a run's commands must not read: the live checkout and its sibling
+    Mnemorph checkouts, the live project, and the hosts' live sessions, skills and
+    Mnemorph links. Rewriting paths cannot seal a run (history, ancestor pages,
+    `~` and links name them in ways no rewrite catches), so the sandbox denies them."""
+    home = Path.home()
+    found = []
+    if root is not None:
+        found += [root, *(p for p in root.parent.iterdir() if p.name.lower().startswith("mnemorph"))]
+    if project is not None:
+        found.append(project)
+    found += [home / ".codex" / n for n in ("sessions", "archived_sessions", "skills", "mnemorph", "memories")]
+    found += [home / ".claude" / n for n in ("projects", "skills", "mnemorph")]
+    for host in (home / ".codex", home / ".claude"):  # framework links under any name
+        found += sorted(p for p in host.iterdir() if p.is_symlink()) if host.is_dir() else []
+    out = []
+    for p in found:
+        for q in (p, p.resolve()):
+            if (q.exists() or q.is_symlink()) and str(q) not in out:
+                out.append(str(q))
+    return out
+
+
+def deny_options(deny: list[str]) -> list[str]:
+    """A permissions profile: the workspace as usual, minus reads of live state."""
+    if not deny:
+        return []
+    table = ", ".join(json.dumps(p) + ' = "deny"' for p in deny)
+    return ["-c", 'default_permissions="replay_sealed"', "-c", 'permissions.replay_sealed.extends=":workspace"',
+            "-c", "permissions.replay_sealed.filesystem={" + table + "}"]
+
+
+def isolation_options(deny: list[str] = ()) -> list[str]:
     cmd = ["-c", 'approval_policy="never"', *TMP_EXCLUSIONS]
+    cmd += deny_options(deny)
     for feature in DISABLED:
         cmd += ["--disable", feature]
     for server in enabled_mcp_servers():
@@ -101,13 +139,23 @@ def isolation_options() -> list[str]:
     return cmd
 
 
-def codex_command(workdir: Path, out: Path, a) -> list[str]:
+def check_denial(deny: list[str]) -> None:
+    """Refuse to run when the profile does not stop a command reading live state."""
+    if not deny or shutil.which("codex") is None:
+        return
+    probe = subprocess.run(["codex", "sandbox", *deny_options(deny), "--", "/bin/ls", deny[0]],
+                           capture_output=True, text=True, timeout=60)
+    if probe.returncode == 0:
+        raise SystemExit(f"read-deny failed: a sandboxed command could list {deny[0]}; not running")
+
+
+def codex_command(workdir: Path, out: Path, a, deny: list[str] = ()) -> list[str]:
     """workdir is the run's working directory: the copy, or the project clone."""
     # --ephemeral stops spawned subagents from finding their parent thread ("no
     # thread with id"); a sealed run keeps its sessions in its own CODEX_HOME,
     # which is deleted afterwards, so only an unsealed run stays ephemeral.
     cmd = ["codex", "exec", "-C", str(workdir), *(["--ephemeral"] if a.no_seal else []), "--json",
-           "-o", str(out / "last.md"), "-s", "workspace-write", *isolation_options()]
+           "-o", str(out / "last.md"), *([] if deny else ["-s", "workspace-write"]), *isolation_options(deny)]
     cmd += model_options(a)
     for image in a.image or []:
         cmd += ["-i", str(Path(image).resolve())]
@@ -213,13 +261,14 @@ def main(argv: list[str] | None = None, prog: str | None = None) -> int:
     out = Path(a.out).resolve()
     work = common.work_dir("codex", plain=not a.no_plain_paths)
     copy, project = common.layout(work, root, a.project)
-    cmd = codex_command(project or copy, out, a)
+    cmd = codex_command(project or copy, out, a, [] if a.no_seal else live_paths(root, live_project))
     if a.dry_run:
         print(shlex.join(cmd), "<", a.prompt_file)
         print(replay_check.summary(check))
         print(common.fidelity_note(a, check, copy))
         common.remove_tree(work)
         return 0
+    check_denial([] if a.no_seal else live_paths(root, live_project))
     out.mkdir(parents=True, exist_ok=True)
     common.save_check(out, check)
     started = time.time()

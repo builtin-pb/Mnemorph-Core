@@ -54,6 +54,8 @@ def record(rec, cwd):
 CODEX = COMMON + r'''
 if args[:1] == ["--version"]:
     print("codex-cli 9.9.9"); sys.exit(0)
+if args[:1] == ["sandbox"]:  # the read-deny preflight: denied unless a test says otherwise
+    sys.exit(0 if os.environ.get("FAKE_SANDBOX_READS") else 1)
 if args[:2] == ["mcp", "list"]:
     if os.environ.get("FAKE_MCP_LIST_FAILS"):
         print("error: could not read MCP servers", file=sys.stderr); sys.exit(1)
