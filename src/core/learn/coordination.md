@@ -23,7 +23,7 @@ Give a delegate the goal, the original request and artifacts or source pointers,
 
 For work that outlasts a call, retain its handle, source basis and next check. Do not hold a turn sleeping or polling: set a wake-up that does not depend on the work finishing, such as heartbeats from `tools/replay_batch.py` under a watcher, then do useful work that cannot disturb it or end the turn. Check the first results soon after launch; check again after any change to what the work runs on and on completion, blockage, material feedback, a deadline or a source change. Give a change to a tool that running or queued work uses one real run before relying on it.
 
-Each check judges whether the work will reach its purpose within its remaining allowances and as well as another route would, and traces a shortfall to its cause. A shortfall requires action, not a note: apply an allowed fix, or else pause the work and tell the user. Stay quiet only when the check finds nothing material. A prompt that schedules checks must be a few lines, preferably pointing to a reviewed file, and must name the judgment and the allowed fixes.
+Each check judges whether the work will reach its purpose within its remaining allowances and as well as another route would, and traces a shortfall to its cause. A shortfall requires action, not a note: apply an allowed fix, or else pause the work and tell the user. Stay quiet only when the check finds nothing material. A prompt that schedules checks must itself be a few lines that ask for this judgment and for action on a shortfall.
 
 ## Handle changes and interruptions
 
