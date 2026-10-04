@@ -6,8 +6,9 @@ has labelled yet; label it, then trace again. Each packet carries the catalog of
 and, for each message, the earlier messages most like it. A fresh agent labels
 each message with `verdict`: `new` (a correction of a kind not yet in the
 catalog, with a one-line description), `repeat` (a correction of a catalogued
-kind) or `none` (not a correction). `count` reports repeats per 100 work
-messages by host and model. Labels and the catalog live in the instance's
+kind) or `none` (not a correction), naming its own model. `count` reports
+repeats per 100 work messages by host and model, and by the model that
+labelled them. Labels and the catalog live in the instance's
 src/research/repeats.jsonl; they hold message ids and one-line kind
 descriptions, never message text. Standard library only.
 """
@@ -52,11 +53,11 @@ they have them; they help you find the kind but are not a verdict. The same text
 A message with two corrections gets a second label with --also. Judge only from the texts given.
 
 Record each label with the tool, in order, since a `new` label adds a kind that later
-messages in the packet may repeat:
-  python3 tools/repeats.py verdict MESSAGE_ID none
-  python3 tools/repeats.py verdict MESSAGE_ID repeat --kind KIND_ID
-  python3 tools/repeats.py verdict MESSAGE_ID new --describe "one-line expectation"
-  python3 tools/repeats.py verdict MESSAGE_ID repeat --of EARLIER_ID [--describe "one-line expectation"]
+messages in the packet may repeat. MODEL is your own model id, as your host states it:
+  python3 tools/repeats.py verdict MESSAGE_ID none --labeller MODEL
+  python3 tools/repeats.py verdict MESSAGE_ID repeat --kind KIND_ID --labeller MODEL
+  python3 tools/repeats.py verdict MESSAGE_ID new --describe "one-line expectation" --labeller MODEL
+  python3 tools/repeats.py verdict MESSAGE_ID repeat --of EARLIER_ID [--describe "one-line expectation"] --labeller MODEL
 The last form is for a repeat of an earlier correction (for example one in `similar`); give
 --describe when that earlier message has no kind yet, and it becomes the kind.
 Then return the number of messages labelled and any you could not decide."""
@@ -192,7 +193,7 @@ def verdict(args) -> dict:
     if mine and not args.also:
         raise ValueError(f"{args.message} is already labelled; use --also for a second correction in it")
     entry = {"message": args.message, "time": record[args.message]["time"], "labelled": now(),
-             "label": args.label}
+             "labeller": args.labeller, "label": args.label}
     kinds = {k["kind"] for k in catalog(ledger)}
     appended = []
     if args.label == "repeat" and args.kind:
@@ -206,7 +207,8 @@ def verdict(args) -> dict:
         if prior:
             entry["kind"] = prior[0]["kind"]
         elif args.describe:
-            first = {"message": args.of, "time": record[args.of]["time"], "labelled": now(), "label": "new",
+            first = {"message": args.of, "time": record[args.of]["time"], "labelled": now(),
+                     "labeller": args.labeller, "label": "new",
                      "kind": next_kind(ledger), "describe": " ".join(args.describe.split()),
                      "note": "catalogued when first repeated"}
             appended.append(first)
@@ -244,6 +246,7 @@ def count(args) -> dict:
     kinds = {k["kind"]: k["describe"] for k in catalog(ledger)}
     rec = _record_tool(args.root)
     cache, by_model, repeats, new_kinds = {}, collections.defaultdict(collections.Counter), [], []
+    by_labeller = collections.defaultdict(collections.Counter)
     for e in record:
         if not is_work(e):
             continue
@@ -258,6 +261,10 @@ def count(args) -> dict:
         names = {x["label"] for x in found}
         top = "repeat" if "repeat" in names else "new" if "new" in names else "none"
         c[top] += 1
+        # a labeller switch can move the rate on its own, so keep each labeller's share visible
+        who = by_labeller[found[0].get("labeller", "unrecorded")]
+        who["labelled"] += 1
+        who["repeat"] += top == "repeat"
         fresh = lambda x: bool(args.new_since and x.get("labelled", "") >= args.new_since)
         for x in found:
             if x["label"] == "repeat":
@@ -275,6 +282,7 @@ def count(args) -> dict:
             "repeats": total["repeat"],
             "repeats_per_100_labelled": round(100 * total["repeat"] / labelled, 1) if labelled else None,
             "by_host_model": {k: dict(v) for k, v in sorted(by_model.items())},
+            "by_labeller": {k: dict(v) for k, v in sorted(by_labeller.items())},
             "repeats_listed": repeats, "new_kinds": new_kinds}
 
 
@@ -294,6 +302,7 @@ def parser() -> argparse.ArgumentParser:
     v.add_argument("--of", help="for a repeat of an earlier correction: its message id")
     v.add_argument("--also", action="store_true", help="add a second correction label to a labelled message")
     v.add_argument("--note")
+    v.add_argument("--labeller", required=True, help="the labelling agent's own model id")
     c = sub.add_parser("count", help="repeats per 100 work messages, by host and model")
     c.add_argument("--since", default=START)
     c.add_argument("--new-since")

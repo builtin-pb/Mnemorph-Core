@@ -42,6 +42,8 @@ class RepeatsToolTests(unittest.TestCase):
             "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
 
     def run_tool(self, *argv):
+        if argv[0] == "verdict":
+            argv = (*argv, "--labeller", "test-model")
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = repeats.main(["--root", str(self.root), *argv])
@@ -73,6 +75,7 @@ class RepeatsToolTests(unittest.TestCase):
         self.assertEqual(result["corrections"], 2)
         self.assertEqual(result["repeats_listed"][0]["kind"], "keep replies short: lead with decisions")
         self.assertIn("do not restart running work", [k["describe"] for k in result["new_kinds"]])
+        self.assertEqual(result["by_labeller"], {"test-model": {"labelled": 3, "repeat": 1}})
         ledger = (self.root / repeats.LEDGER).read_text()
         self.assertNotIn("summary is too long", ledger)  # ids, never text
 
@@ -85,6 +88,13 @@ class RepeatsToolTests(unittest.TestCase):
         packet = json.loads((self.root / repeats.PACKETS / "next.json").read_text())
         self.assertEqual([k["describe"] for k in packet["catalog"]], ["keep replies short", "check facts"])
         self.assertEqual([m["id"] for m in packet["messages"]], ["claude:m3"])
+
+    def test_verdict_needs_the_labeller(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            repeats.main(["--root", str(self.root), "verdict", "claude:m3", "none"])
+        self.run_tool("verdict", "claude:m3", "none")
+        row = json.loads((self.root / repeats.LEDGER).read_text().splitlines()[-1])
+        self.assertEqual(row["labeller"], "test-model")
 
     def test_repeat_needs_a_kind_or_an_earlier_message(self):
         code, _, err = self.run_tool("verdict", "claude:m2", "repeat")
