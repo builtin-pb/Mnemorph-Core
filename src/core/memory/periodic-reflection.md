@@ -29,7 +29,7 @@ The time bound is a ceiling, not a target; stop when the work is done. Keep at m
 
 ## Test changed instructions
 
-After committing, give each lesson this run moved into an instruction a [lesson test](lesson-tests.md). Report the results, and as candidates, not learned, what `tools/lessons.py candidates` lists from the cursor's previous `ending_head` and this run's branch base.
+After committing, test each lesson this run moved into an instruction as [lesson tests](lesson-tests.md#choose-the-test-by-cost) choose by cost, reporting the branch each took and why. Check each lesson record whose case reads "real runs until" a date now past against the sessions that loaded the edit: record `pass` or `fail` where they settle it, list it for the user where they do not, and park an edit that brought no gain or did harm under the authority rules above. Report the results, and as candidates, not learned, what `tools/lessons.py candidates` lists from the cursor's previous `ending_head` and this run's branch base.
 
 ## Audit removals
 
