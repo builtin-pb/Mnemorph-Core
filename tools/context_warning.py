@@ -72,7 +72,9 @@ def warn(event: dict, limit: int) -> dict | None:
             "additionalContext": (
                 f"This session's context has reached about {used}k tokens, past the user's {cap}k limit "
                 "for one session. After answering this message, say so in one line and offer to write a "
-                "short handoff (open decisions, running work, where the files are) for a fresh session."),
+                "short handoff (open decisions, running work, where the files are) for a fresh session, "
+                "and when you write one, also leave a one-click task that starts the fresh session from it "
+                "if your host offers one."),
         },
     }
 
