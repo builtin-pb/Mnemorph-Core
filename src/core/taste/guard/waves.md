@@ -1,6 +1,6 @@
 ---
 id: core.taste.guard.waves
-summary: Principles for one Guard pass, run each time a Guard is started or woken (on Codex, a fresh Guard per event): delegate early, judge the work itself, ask what the user will object to and what lies above the current step, reply once.
+summary: Principles for one Guard pass, run each time a Guard is started or woken (on Codex, a fresh Guard each time the previous one replies): delegate early, judge the work itself, ask what the user will object to and what lies above the current step, reply once.
 ---
 
 # One pass
