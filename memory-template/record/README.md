@@ -34,3 +34,7 @@ Lines are in append order; sort by `time` when order matters.
 - Only the user's later words supersede earlier ones. Agent summaries, rules and memory never do.
 - Private like `src/personal/`: never published or offered upstream.
 - Not loaded by default; memory may cite entries by `time` and a short quote.
+
+## Reviewed source exclusions
+
+Agent-launched messages can carry a user role. After reviewing native launch evidence, an instance may save exclusions in `src/record/source-exclusions.json`: `entries` with exact record `id`, SHA-256 of credential-redacted `text` as `text_sha256`, and `reason`. Append skips only these messages (`reviewed_nonhuman_message`), retaining human follow-ups. Malformed decisions or changed text stop all writes. This prevents known reimports, not new misclassification or existing-record repair. Keep private evidence in the instance. Undo by removing an entry; append considers it again.

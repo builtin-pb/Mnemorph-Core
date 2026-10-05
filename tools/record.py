@@ -1055,9 +1055,39 @@ def recorded_sources(directory: Path) -> set[str]:
     return sources
 
 
+def load_source_exclusions(root: Path) -> dict[str, str]:
+    """Read reviewed message exclusions without inferring authorship from wording.
+
+    Exact record ids and hashes of redacted text bind each decision to one
+    message. Evidence and reasons stay in the instance manifest, never Core.
+    """
+    path = root / "src" / "record" / "source-exclusions.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"{path}: can't read source exclusions ({error})") from None
+    if not isinstance(data, dict) or not isinstance(data.get("entries"), list):
+        raise ValueError(f"{path}: entries must be a list")
+    result = {}
+    for entry in data["entries"]:
+        if (not isinstance(entry, dict)
+                or not isinstance(entry.get("id"), str) or not entry["id"]
+                or not isinstance(entry.get("reason"), str) or not entry["reason"].strip()
+                or not isinstance(entry.get("text_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", entry["text_sha256"])):
+            raise ValueError(f"{path}: each exclusion needs id, reason and text_sha256")
+        if entry["id"] in result:
+            raise ValueError(f"{path}: duplicate exclusion id")
+        result[entry["id"]] = entry["text_sha256"]
+    return result
+
+
 def append(args) -> dict:
     directory = args.root / "src" / "record"
     policy = load_policy(args.root)  # malformed: raises before anything is read or written
+    source_exclusions = load_source_exclusions(args.root)
     ids, copies, existing = load_record(directory)
     run = Run()
     if not args.no_claude:
@@ -1068,6 +1098,12 @@ def append(args) -> dict:
     added, by_month = [], collections.defaultdict(list)
     skipped = collections.Counter()
     for entry in run.entries:
+        if entry["id"] in source_exclusions:
+            digest = hashlib.sha256(entry["text"].encode("utf-8")).hexdigest()
+            if digest != source_exclusions[entry["id"]]:
+                raise ValueError("reviewed source exclusion text changed; no records appended")
+            skipped["reviewed_nonhuman_message"] += 1
+            continue
         copy = (entry["host"], entry["time"], text_key(entry["text"], entry.get("attachments")))
         if entry["id"] in ids:
             skipped["already_recorded"] += 1

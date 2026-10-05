@@ -592,6 +592,55 @@ class RecordTests(unittest.TestCase):
         self.assertEqual(summary["excluded"]["codex"]["fork_or_resume_replay"], 2)
         self.assertEqual(sum(1 for row in rows.values() if row["message"] == "u1"), 1)
 
+    def write_source_exclusions(self, entries):
+        path = self.root / "src" / "record" / "source-exclusions.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"entries": entries}), encoding="utf-8")
+
+    def test_reviewed_exclusion_keeps_other_messages_and_human_cli(self):
+        self.write_source_exclusions([{
+            "id": "codex:reviewed-job", "reason": "Fixture parent launched this message",
+            "text_sha256": record.hashlib.sha256(b"Please fix the flaky test").hexdigest(),
+        }])
+        # Use a new eligible CLI session: only its reviewed message is excluded.
+        day = self.codex / "2026" / "10" / "02"
+        jsonl(day / "rollout-reviewed.jsonl", [
+            codex_meta("reviewed", "2026-10-02T13:00:00Z", source="cli"),
+            codex_user("2026-10-02T13:00:01Z", 1, "reviewed-job", "Please fix the flaky test"),
+            codex_user("2026-10-02T13:00:02Z", 2, "human-followup", "Stop this job now"),
+        ])
+        summary, _ = self.append()
+        self.assertEqual(summary["skipped"]["reviewed_nonhuman_message"], 1)
+        entries = self.entries()
+        self.assertNotIn("reviewed-job", entries)
+        self.assertIn("human-followup", entries)
+        self.assertIn("o1", entries)  # ordinary human CLI use is still eligible
+        summary, _ = self.append()
+        self.assertEqual(summary["added"], 0)
+        self.assertEqual(summary["skipped"]["reviewed_nonhuman_message"], 1)
+
+    def test_source_exclusion_hash_mismatch_leaves_record_unchanged(self):
+        self.append()
+        before = {p: p.read_bytes() for p in (self.root / "src" / "record").glob("*.jsonl")}
+        self.write_source_exclusions([{
+            "id": "codex:o1", "reason": "Reviewed message", "text_sha256": "0" * 64,
+        }])
+        code, out = self.run_tool("append", "--claude-projects", str(self.claude),
+                                  "--codex-sessions", str(self.codex), "--codex-state", str(self.state))
+        self.assertNotEqual(code, 0)
+        self.assertEqual(before, {p: p.read_bytes() for p in before})
+
+    def test_malformed_source_exclusions_fail_before_append(self):
+        for entries in ([{"id": "codex:o1"}], "not a list", [{
+                "id": "codex:o1", "reason": "Reviewed", "text_sha256": "0" * 64,
+            }] * 2):
+            with self.subTest(entries=entries):
+                self.write_source_exclusions(entries)
+                code, _ = self.run_tool("append", "--claude-projects", str(self.claude),
+                                        "--codex-sessions", str(self.codex), "--codex-state", str(self.state))
+                self.assertNotEqual(code, 0)
+                self.assertFalse(list((self.root / "src" / "record").glob("*.jsonl")))
+
     def test_append_is_idempotent_and_partitions_by_month(self):
         self.append()
         before = {p.name: p.read_bytes() for p in (self.root / "src" / "record").glob("*.jsonl")}
