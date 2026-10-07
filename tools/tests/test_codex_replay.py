@@ -19,12 +19,13 @@ class DryRun(ReplayCase):
                      f'"{self.root}" = "deny"', 'approval_policy="never"',
                      "--disable apps", "--disable plugins", "--disable computer_use",
                      "--disable browser_use", "--disable in_app_browser",
-                     "exclude_slash_tmp=true", "exclude_tmpdir_env_var=true",
+                     '":slash_tmp" = "read"', '":tmpdir" = "read"',
                      "mcp_servers.docs.enabled=false"):
             self.assertIn(flag, out)
         self.assertNotIn("--ephemeral", out)  # sealed runs keep sessions so subagents can spawn
         self.assertNotIn("app-server", out)  # not defined in config.toml
         self.assertNotIn("danger", out)
+        self.assertNotIn("sandbox_workspace_write", out)
         self.assertFalse(self.out.exists())
 
     def test_failed_server_listing_still_turns_off_config_servers(self):
@@ -72,6 +73,12 @@ class SealedRun(ReplayCase):
         r = self.replay("codex", *self.run_args(), FAKE_SANDBOX_READS="1")
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("read-deny failed", r.stderr + r.stdout)
+
+    def test_refuses_to_run_when_sandbox_cannot_start(self):
+        r = self.replay("codex", *self.run_args(), FAKE_SANDBOX_ERROR="1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("read-deny failed", r.stderr + r.stdout)
+        self.assertFalse((self.out / "manifest.json").exists())
 
     def test_outputs_and_manifest(self):
         r = self.ok(self.replay("codex", *self.run_args("--effort", "medium"),
@@ -160,7 +167,7 @@ class ForkRun(ReplayCase):
         log = self.fake_log()
         self.assertEqual(log["argv"][:2], ["exec", "fork"])
         joined = " ".join(log["argv"])
-        for flag in ("exclude_slash_tmp=true", "exclude_tmpdir_env_var=true", 'approval_policy="never"',
+        for flag in ('":slash_tmp" = "read"', '":tmpdir" = "read"', 'approval_policy="never"',
                      "mcp_servers.docs.enabled=false", "-m gpt-6-astra"):
             self.assertIn(flag, joined)
         self.assertEqual(log["prompt"], "second")

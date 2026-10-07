@@ -140,7 +140,7 @@ class CodexFork(ReplayCase):
         self.assertIn("patched.md", log["cwd_files"])
         self.assertEqual(log["home"]["mnemorph"], str(copy))
         self.assertIn("made-by-run.txt", (self.out / "changes.diff").read_text())
-        self.assertIn("exclude_slash_tmp=true", " ".join(log["argv"]))
+        self.assertIn('\":slash_tmp\" = \"read\"', " ".join(log["argv"]))
 
 
 class ClaudeFork(ReplayCase):

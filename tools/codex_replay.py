@@ -17,8 +17,8 @@ CODEX_HOME, live paths rewritten; see seal()); outside paths that commands name 
 in outside-reads.json, and those carrying evaluation material, created after
 the request or changed since it in contaminated.json; escalation
 requests are refused (approval policy "never"); the copy has no Git remote; the
-Codex sandbox's default write access to /tmp and $TMPDIR is turned off, so shell
-writes reach only the working copy (untested beyond a dry run). Copies live under
+Codex sandbox's default write access to /tmp and $TMPDIR is turned off through
+the active permission profile (or legacy exclusions for unsealed runs). Copies live under
 ~/.cache/mnemorph-replay, inside the already trusted home directory. A sealed
 run links the user's Codex login and copies the global config into its own
 home, so trust entries stay there. With --no-seal the run uses ~/.codex itself
@@ -121,17 +121,20 @@ def live_paths(root: Path | None, project: Path | None = None) -> list[str]:
 
 
 def deny_options(deny: list[str]) -> list[str]:
-    """A permissions profile: the workspace as usual, minus reads of live state."""
+    """Workspace writes, without temporary writes or reads of live state."""
     if not deny:
         return []
-    table = ", ".join(json.dumps(p) + ' = "deny"' for p in deny)
+    # Named profiles do not compose with sandbox_workspace_write exclusions.
+    # Override the temporary write grants inherited from :workspace here.
+    entries = {":slash_tmp": "read", ":tmpdir": "read", **dict.fromkeys(deny, "deny")}
+    table = ", ".join(json.dumps(p) + " = " + json.dumps(access) for p, access in entries.items())
     return ["-c", 'default_permissions="replay_sealed"', "-c", 'permissions.replay_sealed.extends=":workspace"',
             "-c", "permissions.replay_sealed.filesystem={" + table + "}"]
 
 
 def isolation_options(deny: list[str] = ()) -> list[str]:
-    cmd = ["-c", 'approval_policy="never"', *TMP_EXCLUSIONS]
-    cmd += deny_options(deny)
+    cmd = ["-c", 'approval_policy="never"']
+    cmd += deny_options(deny) if deny else list(TMP_EXCLUSIONS)
     for feature in DISABLED:
         cmd += ["--disable", feature]
     for server in enabled_mcp_servers():
@@ -143,10 +146,15 @@ def check_denial(deny: list[str]) -> None:
     """Refuse to run when the profile does not stop a command reading live state."""
     if not deny or shutil.which("codex") is None:
         return
-    probe = subprocess.run(["codex", "sandbox", *deny_options(deny), "--", "/bin/ls", deny[0]],
+    # A CLI/config error or sandbox startup failure is not proof of denial.
+    script = ("import os, sys\ntry: os.listdir(sys.argv[1])\n"
+              "except PermissionError: print('replay-read-denied'); sys.exit(73)\n")
+    probe = subprocess.run(["codex", "sandbox", *deny_options(deny),
+                            "--", sys.executable, "-c", script, deny[0]],
                            capture_output=True, text=True, timeout=60)
-    if probe.returncode == 0:
-        raise SystemExit(f"read-deny failed: a sandboxed command could list {deny[0]}; not running")
+    if probe.returncode != 73 or probe.stdout.strip() != "replay-read-denied":
+        raise SystemExit(f"read-deny failed: expected a permission denial for {deny[0]}, "
+                         f"got exit {probe.returncode}: {probe.stderr.strip()}; not running")
 
 
 def codex_command(workdir: Path, out: Path, a, deny: list[str] = ()) -> list[str]:
