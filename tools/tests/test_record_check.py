@@ -138,6 +138,54 @@ class RecordCheckTests(unittest.TestCase):
         self.assertEqual(rc.terms("办公用"), ["办公", "公用"])
         self.assertEqual(rc.terms("unmaintained prompts"), rc.terms("maintained prompt"))
 
+    def test_packet_preserves_mixed_record_and_hash_bound_authorship(self):
+        record = self.root / "src" / "record" / "2030-01.jsonl"
+        rows = [json.loads(line) for line in record.read_text().splitlines()]
+        human_suffix = "Human addition: keep the reporting scope limited to this one project."
+        rows[0]["text"] = "Assistant handoff: " + "a proposed workflow. " * 80 + "\n" + human_suffix
+        record.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+        original = record.read_bytes()
+        entry = rc.load_words(self.root)[0]
+        qualification = "The opening plan is assistant-authored; the final request is a direct human addition."
+        (record.parent / "source-attributions.json").write_text(json.dumps({"entries": [{
+            "id": entry["id"], "text_sha256": rc.hashlib.sha256(entry["text"].encode()).hexdigest(),
+            "qualification": qualification, "source": "native-parent.jsonl", "line": 7,
+        }]}), encoding="utf-8")
+        entries = rc.load_words(self.root)
+        self.assertEqual(record.read_bytes(), original)
+        self.assertEqual(len(entries), len(MESSAGES))
+        item = {"id": "test", "path": "guide.md", "old": "Keep this workflow and its reporting scope.", "new": "", "file_deleted": False}
+        text = rc.packet([item], rc.Index(entries), "test", "2030", "HEAD")
+        self.assertNotIn(human_suffix, text)  # The suffix is beyond the bounded excerpt.
+        self.assertIn("CLIPPED: full record `src/record/2030-01.jsonl`:1", text)
+        recovered = json.loads((self.root / entries[0]["_record_path"]).read_text().splitlines()[entries[0]["_record_line"] - 1])
+        self.assertEqual(recovered["text"], entry["text"])
+        self.assertIn("current source checkout", text)
+        self.assertIn(rc.hashlib.sha256(recovered["text"].encode()).hexdigest(), text)
+        self.assertIn(recovered["id"], text)
+        committed = json.loads(git(self.root, "show", "HEAD:src/record/2030-01.jsonl").splitlines()[0])
+        self.assertNotEqual(committed["text"], recovered["text"])
+        self.assertIn(human_suffix, recovered["text"])
+        self.assertIn(qualification, text)
+        self.assertIn("native-parent.jsonl`:7", text)
+        self.assertIn("preserve direct human additions", text)
+
+    def test_mismatched_authorship_is_warning_not_applied_evidence(self):
+        entry = rc.load_words(self.root)[0]
+        (self.root / "src/record/source-attributions.json").write_text(json.dumps({"entries": [{
+            "id": entry["id"], "text_sha256": "wrong", "qualification": "Do not attribute this stale claim.",
+        }]}), encoding="utf-8")
+        item = {"id": "test", "path": "guide.md", "old": entry["text"], "new": "", "file_deleted": False}
+        text = rc.packet([item], rc.Index(rc.load_words(self.root)), "test", "2030", "HEAD")
+        self.assertIn("does not match this message's text hash", text)
+        self.assertNotIn("Do not attribute this stale claim.", text)
+        self.assertIn(entry["text"], text)
+
+    def test_malformed_authorship_is_not_silently_ignored(self):
+        (self.root / "src/record/source-attributions.json").write_text('{"entries": [{}]}', encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "authorship entries require"):
+            rc.load_words(self.root)
+
     def test_cutoff_hides_later_words(self):
         entries = rc.load_words(self.root, "2030-01-20T00:00:00.000Z")
         self.assertEqual([e["id"] for e in entries], ["codex:m0"])

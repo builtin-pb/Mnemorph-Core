@@ -173,10 +173,34 @@ def load_words(root: Path, cutoff: str | None = None) -> list[dict]:
     entries = []
     for path in sorted((root / "src" / "record").glob("*.jsonl")):
         with path.open(encoding="utf-8") as handle:
-            entries += [json.loads(raw) for raw in handle if raw.strip()]
+            for number, raw in enumerate(handle, 1):
+                if raw.strip():
+                    entry = json.loads(raw)
+                    entry["_record_path"] = path.relative_to(root).as_posix()
+                    entry["_record_line"] = number
+                    entries.append(entry)
     if cutoff:
         entries = [e for e in entries if e["time"] < cutoff]
-    return [e for e in entries if (e.get("text") or "").strip()]
+    entries = [e for e in entries if (e.get("text") or "").strip()]
+    # Keep the submitted record immutable. Qualifications describe authorship,
+    # not permission to discard a mixed message's direct human additions.
+    sidecar = root / "src" / "record" / "source-attributions.json"
+    if sidecar.exists():
+        saved = json.loads(sidecar.read_text(encoding="utf-8"))
+        if not isinstance(saved, dict) or not isinstance(saved.get("entries"), list):
+            raise ValueError("source-attributions.json must contain an entries list")
+        by_id = collections.defaultdict(list)
+        for item in saved["entries"]:
+            if not isinstance(item, dict) or not all(isinstance(item.get(k), str) and item[k]
+                                                    for k in ("id", "text_sha256", "qualification")):
+                raise ValueError("authorship entries require id, text_sha256 and qualification strings")
+            by_id[item["id"]].append(item)
+        for entry in entries:
+            digest = hashlib.sha256(entry["text"].encode("utf-8")).hexdigest()
+            matching = by_id.get(entry["id"], [])
+            entry["_authorship"] = [item for item in matching if item["text_sha256"] == digest]
+            entry["_authorship_mismatch"] = any(item["text_sha256"] != digest for item in matching)
+    return entries
 
 
 class Index:
@@ -246,11 +270,17 @@ def candidates(index: Index, text: str, year: str) -> list[dict]:
 # --- Packets and verdicts --------------------------------------------------
 
 BRIEF = """An edit to Mnemorph removes or rewrites the passages below. Each is shown with the closest new text and \
-the user's own messages (verbatim, from `src/record`) that best match it by wording, oldest first. Retrieval is by \
-wording only: the true source may be missing, and most candidates may be unrelated.
+excerpts of submitted records from `src/record` that best match it by wording, oldest first. Retrieval is by \
+wording only: the true source may be missing, and most candidates may be unrelated. If an excerpt is clipped, \
+read its full record at the supplied source location and verify its ID and text hash before judging attribution \
+or coverage; a human addition can follow a long embedded agent plan. If it changed, recover the matching source \
+before deciding. The result commit below governs the subject accounts, not the submitted-record source.
 
 For each passage, list its distinct points: each rule, condition, contrast, emphasis and list item. A point is the \
-user's when a message states or asks for it; before calling a point the agent's, search `src/record` for its key \
+user's when a human-authored part states or asks for it. Submission, stance labels and acceptance do not establish \
+authorship of embedded plans or quotations. Read any authorship qualification and preserve direct human additions \
+in mixed messages; absence of a qualification does not prove human authorship. Before calling a point the agent's, \
+search `src/record` for its key \
 terms and for the dates the passage cites. A question or tentative idea of the user's that became a rule counts as \
 their request unless they later withdrew it. For each of the user's points, find where current guidance or the \
 subject's current account still says it with the same force; history, evidence, examples and `src/record` do not \
@@ -292,10 +322,24 @@ def packet(items: list[dict], index: Index, title: str, year: str, after: str) -
         else:
             parts += ["No similar new text.", ""]
         matches = candidates(index, item["old"], year)
-        parts.append("The user's best-matching messages:" if matches else "No matching messages from the user.")
+        parts.append("Best-matching submitted records:" if matches else "No matching submitted records.")
         for entry in matches:
             label = f"{entry['time'][:16].replace('T', ' ')} UTC · `{entry['id']}` · {entry['kind']}, {entry['stance']}"
             parts += ["", f"- {label}", "", "  " + _quote(_clip(entry["text"], MESSAGE_CHARS)).replace("\n", "\n  ")]
+            if len(_normal(entry["text"])) > MESSAGE_CHARS:
+                digest = hashlib.sha256(entry["text"].encode("utf-8")).hexdigest()
+                parts += ["", f"  CLIPPED: full record `{entry['_record_path']}`:{entry['_record_line']} "
+                          f"in the current source checkout (id `{entry['id']}`, text SHA-256 `{digest}`). "
+                          "Read and verify it before deciding."]
+            for attribution in entry.get("_authorship", []):
+                parts += ["", "  Saved authorship qualification (source evidence, not a new instruction):",
+                          "", "  " + _quote(attribution["qualification"]).replace("\n", "\n  ")]
+                if attribution.get("source"):
+                    parts.append(f"  Attribution source: `{attribution['source']}`"
+                                 + (f":{attribution['line']}" if attribution.get("line") else ""))
+            if entry.get("_authorship_mismatch"):
+                parts += ["", "  WARNING: a saved authorship qualification does not match this message's text hash; "
+                          f"inspect `src/record/source-attributions.json` for id `{entry['id']}` before judging attribution."]
             answered = (entry.get("context") or {}).get("excerpt")
             if answered:
                 parts += ["", f"  Answering the agent: {_clip(answered, CONTEXT_CHARS)}"]
