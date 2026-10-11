@@ -1,6 +1,6 @@
 ---
 id: core.learn.coordination
-summary: Keep delegated work, live effects and interrupted operations accountable and recoverable.
+summary: Keep delegated work accountable, convergent and recoverable, from the shape of large constructions to live effects and interrupted operations.
 ---
 
 # Coordination
@@ -18,6 +18,15 @@ Judge actual returns against their assigned work and the whole purpose; add acto
 ## Brief delegates
 
 Give a delegate the goal, the original request and artifacts or source pointers, allowed effects, a resource bound and the expected return or stopping condition. Keep the brief concise and non-leading: do not retell the owner's reasoning or preload its diagnosis, preferred answer, arguments or proposed findings; add only context the work needs, labelling a required hypothesis or method with its source. Tell a delegate whose work needs neither Mnemorph's methods nor its memory not to load Mnemorph. A child gains no independent publication authority.
+
+## Own the shape of large constructions
+
+When many delegates build one connected result, such as a large proof or system, own its central shape top-down. Built bottom-up, central interfaces belong to no one: each delegate adds a parallel mechanism, and completed parts stop composing.
+- **Ship the shape first:** the top result and its central parts with exact interfaces, in a form that compiles or runs with placeholder parts, plus a readable graph of parts and their status.
+- **Test it across the needed variety:** instantiate it, parts still open, on cases spanning the mechanisms it must carry, up to the most general; then complete the smallest case end to end and keep every completed case working. One small case tests the plumbing but can bend the shape toward itself.
+- **Change the shape only as owner:** delegates fill named parts and report one they find wrong or misplaced; revise the shape for every affected part rather than let them wrap or duplicate it. A second mechanism for a role retires the first or records why both stay. Keep central changes cheap, since delegates add beside what is costly to change.
+- **Measure convergence:** count completed cases and the open parts on the path to the next; when that count stops falling, stop launching and rethink. Finished tasks and recorded open goals are not progress.
+- **Take hard parts depth-first:** give a part that needs a new central argument an owner and a written idea of the argument, keep it on one statement until done, and limit what rests on it unproved.
 
 ## Track long work
 
