@@ -9,7 +9,7 @@ A changed instruction is a candidate until a replay or real runs show it changes
 
 ## Choose the test by cost
 
-Real runs are the standard: later sessions exercise every instruction they load. Replay before adopting when cheap or important; otherwise check the text and let real runs decide.
+Real runs are the standard: a later session tests an instruction when it meets the situation the instruction governs, not merely by loading it. Replay before adopting when cheap or important; otherwise check the text and let real runs decide.
 
 - **Cheap, or a correction the user repeated or emphasized: replay it now**, as below.
   - Cheap means a few runs can show the effect, as for a concrete step or a rule shown at the decision, forked there.
@@ -42,4 +42,4 @@ If the miss recurs, the instruction has not carried the lesson. Make it more con
 
 ## Record
 
-Record each replay with `python3 tools/lessons.py record`: the lesson, the changed file and commit, the case, the kind, the check or judge brief, the result, the evidence path, and the failing and replay host/model (`--failed-on`, `--replayed-on`), one record per model. `python3 tools/lessons.py candidates <range>` lists, per guidance file changed in a commit range, the changes not yet learned, naming the models still missing or not passed; report them as candidates, not as learned.
+Record each replay with `python3 tools/lessons.py record`: the lesson, the changed file and commit, the case, the kind, the check or judge brief, the result, the evidence path, and the failing and replay host/model (`--failed-on`, `--replayed-on`), one record per model. Record that model's no-harm comparison as its own verdict, `--no-harm pass`, `fail` or `unverified`, and omit it when not run: an `unverified` effect, as on a model that never had the habit, says nothing about harm. `python3 tools/lessons.py candidates <range>` lists, per guidance file changed in a commit range, the changes not yet learned, naming the models still missing, not passed or without a no-harm pass; report them as candidates, not as learned.

@@ -87,6 +87,8 @@ def outside_reads(root: Path, evidence: str | None) -> list[str]:
 
 def cmd_record(a) -> int:
     root = Path(a.root)
+    if a.no_harm and not (a.replayed_on and a.evidence):
+        raise SystemExit("--no-harm needs --replayed-on and --evidence")
     commit = git(root, "rev-parse", "--verify", f"{a.commit}^{{commit}}").strip()
     entry = {
         "time": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -99,6 +101,8 @@ def cmd_record(a) -> int:
         "result": a.result,
         "evidence": a.evidence or "",
     }
+    if a.no_harm:
+        entry["no_harm"] = a.no_harm
     if a.judge:
         entry["judge"] = a.judge.strip()
     if a.result == "parked":
@@ -114,11 +118,14 @@ def cmd_record(a) -> int:
     for key, val in (("failed_on", a.failed_on), ("replayed_on", a.replayed_on)):
         if val:
             entry[key] = val.strip()
-    leaked = outside_reads(root, a.evidence) if a.result == "pass" else []
-    if leaked and entry["result"] == "pass":
+    passes = [k for k in ("result", "no_harm") if entry.get(k) == "pass"]
+    leaked = outside_reads(root, a.evidence) if passes else []
+    if leaked:
         # A replay that read evaluation material or state from after the replayed
-        # request may have seen the answer; it cannot show the lesson carried.
-        entry["result"] = "unverified"
+        # request may have seen the answer; it cannot show the lesson carried
+        # or that it did no harm.
+        for k in passes:
+            entry[k] = "unverified"
         entry["note"] = (f"{len(leaked)} replay(s) contaminated ({', '.join(leaked[:3])})"
                          + (f"; {a.note.strip()}" if a.note else ""))
     if a.note and "note" not in entry:
@@ -161,18 +168,24 @@ def model_key(label: str) -> str:
 
 
 def status(rows: list[dict], required: list[str]) -> str:
-    """'pass' once the model that missed the lesson passes and every other
-    required model does no worse (both arms passing counts). A lesson fixing
-    one model's habit cannot gain on models that never had it. Later rows
-    for a model supersede earlier ones."""
+    """'pass' once the lesson passes on the model that missed it and its
+    no-harm check passes there and on every other required model. Effect and
+    no-harm are separate verdicts: a lesson fixing one model's habit cannot
+    gain on models that never had it, so an unverified effect there says
+    nothing about harm. A later row for a model supersedes earlier ones for
+    each verdict it records."""
     if not rows:
         return "untested"
     unknown = {"", "unknown"}
     failing = {model_key(r["failed_on"]) for r in rows if r.get("failed_on")} - unknown
     others = {model_key(m) for m in required} - failing
     latest: dict[str, str] = {}
+    no_harm: dict[str, str] = {}
     for r in rows:
-        latest[model_key(r.get("replayed_on", ""))] = r.get("result", "")
+        model = model_key(r.get("replayed_on", ""))
+        latest[model] = r.get("result", "")
+        if r.get("no_harm"):
+            no_harm[model] = r["no_harm"]
     gained = sorted(m for m in latest if latest[m] == "pass")
     if not failing and not gained:
         return rows[-1].get("result", "untested")
@@ -180,11 +193,18 @@ def status(rows: list[dict], required: list[str]) -> str:
     missing += sorted(m for m in others if m not in latest)
     failed = sorted(m for m in failing if m in latest and latest[m] != "pass")
     failed += sorted(m for m in others if latest.get(m) == "fail")
-    if not missing and not failed:
+    harmed = sorted(m for m in no_harm if no_harm[m] == "fail")
+    unchecked = sorted(m for m in (failing | others) & latest.keys()
+                       if no_harm.get(m) not in ("pass", "fail"))
+    if not (missing or failed or harmed or unchecked):
         return "pass"
     parts = [f"passed on {', '.join(gained)}"] if gained else []
     if failed:
         parts.append("not passed on " + ", ".join(failed))
+    if harmed:
+        parts.append("harm on " + ", ".join(harmed))
+    if unchecked:
+        parts.append("no harm unverified on " + ", ".join(unchecked))
     if missing:
         parts.append("missing " + ", ".join(missing))
     return "; ".join(parts)
@@ -245,6 +265,9 @@ def main() -> int:
     p.add_argument("--result", required=True, choices=RESULTS)
     p.add_argument("--evidence", help="path to outputs and verdicts")
     p.add_argument("--judge", help="who judged: script, model, or the person")
+    p.add_argument("--no-harm", choices=("pass", "fail", "unverified"),
+                   help="the no-harm comparison on --replayed-on, separate from "
+                   "--result; omit when it was not run")
     p.add_argument("--failed-on", help="host/model where the miss happened, "
                    "e.g. codex/gpt-6-astra")
     p.add_argument("--replayed-on", help="host/model the replay ran on; record "

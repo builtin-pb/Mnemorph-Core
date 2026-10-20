@@ -133,22 +133,27 @@ class LessonsToolTests(unittest.TestCase):
         self.assertIn("src/writing/compose.md", out)
         self.assertIn('"removed": "Rule six."', (self.root / "src/research/lesson-tests.jsonl").read_text())
 
-    def test_a_one_model_lesson_is_learned_when_the_others_do_no_worse(self):
+    def test_a_one_model_lesson_is_learned_when_no_harm_is_shown_everywhere(self):
         self.write("src/lesson-models.json",
                    '{"models": ["claude/opus-5.5", "codex/gpt-6-astra", "codex/gpt-6-sol"]}')
         self.write("src/writing/compose.md", GUIDE + "Rule five.\n")
         self.commit("Add rule five")
-        def record(model, result):
+        def record(model, result, *no_harm):
             self.run_tool("record", "--lesson", "x", "--file", "src/writing/compose.md",
                           "--commit", "HEAD", "--kind", "concrete", "--case", "c", "--check", "k",
                           "--result", result, "--failed-on", "codex/gpt-6-astra",
-                          "--replayed-on", model)
-        record("codex/gpt-6-astra", "pass")
-        record("claude-code/claude-opus-5-5", "unverified")  # both arms pass: no harm
+                          "--replayed-on", model, "--evidence", "out", *no_harm)
+        record("codex/gpt-6-astra", "pass", "--no-harm", "pass")
+        record("claude-code/claude-opus-5-5", "unverified")  # both arms pass: says nothing of harm
         record("codex/gpt-6-sol", "fail")
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
-        self.assertIn("not passed on gpt-6-sol", out)
-        record("codex/gpt-6-sol", "unverified")  # a later replay supersedes
+        self.assertIn("not passed on gpt-6-sol; no harm unverified on gpt-6-sol, opus-5-5", out)
+        record("claude/opus-5.5", "unverified", "--no-harm", "pass")
+        record("codex/gpt-6-sol", "unverified", "--no-harm", "fail")  # a later replay supersedes
+        _, out = self.run_tool("candidates", f"{self.base}..HEAD")
+        self.assertIn("harm on gpt-6-sol", out)
+        self.assertNotIn("not passed", out)
+        record("codex/gpt-6-sol", "unverified", "--no-harm", "pass")
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
         self.assertNotIn("Add rule five", out)
 
@@ -160,7 +165,8 @@ class LessonsToolTests(unittest.TestCase):
         def record(model, result="pass"):
             self.run_tool("record", "--lesson", "x", "--file", "src/writing/compose.md",
                           "--commit", "HEAD", "--kind", "concrete", "--case", "c",
-                          "--check", "k", "--result", result, "--replayed-on", model)
+                          "--check", "k", "--result", result, "--replayed-on", model,
+                          "--evidence", "out", "--no-harm", "pass")
         record("claude/opus-5.5")
         record("codex/gpt-6-sol", "fail")
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
@@ -172,7 +178,22 @@ class LessonsToolTests(unittest.TestCase):
                       "--result", "pass", "--failed-on", "unknown",
                       "--replayed-on", "claude-code/claude-opus-5-5")  # other labels, unknown miss
         _, out = self.run_tool("candidates", f"{self.base}..HEAD")
-        self.assertNotIn("Add rule four", out)
+        self.assertNotIn("Add rule four", out)  # an earlier no-harm pass still stands
+
+    def test_no_harm_needs_its_model_and_evidence_and_is_voided_by_contamination(self):
+        self.write("src/writing/compose.md", GUIDE + "Rule seven.\n")
+        self.commit("Add rule seven")
+        args = ("record", "--lesson", "x", "--file", "src/writing/compose.md", "--commit", "HEAD",
+                "--kind", "concrete", "--case", "c", "--check", "k", "--result", "pass",
+                "--failed-on", "codex/gpt-6-astra", "--no-harm", "pass")
+        with self.assertRaises(SystemExit):
+            self.run_tool(*args, "--evidence", "out")
+        self.write("out/arm/contaminated.json", '["/later/state"]')
+        _, out = self.run_tool(*args, "--evidence", "out", "--replayed-on", "codex/gpt-6-astra")
+        self.assertIn("recorded unverified", out)
+        row = (self.root / "src/research/lesson-tests.jsonl").read_text()
+        self.assertIn('"no_harm": "unverified"', row)
+        self.assertIn("contaminated", row)
 
 
 if __name__ == "__main__":
