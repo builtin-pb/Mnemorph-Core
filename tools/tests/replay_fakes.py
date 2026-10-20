@@ -46,6 +46,8 @@ def record(rec, cwd):
                note=(w / "note.md").read_text() if (w / "note.md").exists() else None,
                parent_vars=sorted(k for k in os.environ if k.startswith(("CLAUDECODE", "ANTHROPIC", "AI_AGENT"))))
     pathlib.Path(os.environ["FAKE_LOG"]).write_text(json.dumps(rec))
+    if "-s" in args and args[args.index("-s") + 1] == "read-only":
+        return  # like the real sandbox, e.g. the batch reviewer run in the tools' own checkout
     (w / "made-by-run.txt").write_text("run output\n")
     (w / ".mnemorph-local").mkdir(exist_ok=True)
     (w / ".mnemorph-local" / "run-note.md").write_text("ignored state the run wrote\n")
