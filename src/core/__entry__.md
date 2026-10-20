@@ -28,7 +28,7 @@ Use [Learn](learn/learn.md) whenever creating or editing a prompt or agent instr
 
 Use [Reflect](memory/reflect.md) to retain, forget or revise memory as a coherent subject account; a small factual update needs no development cycle.
 
-Use [Coordination](learn/coordination.md) for top-down design of modules larger than one job and for delegated or long-running work.
+Use [Coordination](learn/coordination.md) to design a module or system larger than one job top-down before building it, and for delegated or long-running work: concise, non-leading briefs, information boundaries, checks and integration.
 
 Use [Memory's historical recovery](memory/memory.md#provenance-and-use) for relevant failure diagnosis, distinctive niche matches or explicit historical questions, not as a routine task step.
 
