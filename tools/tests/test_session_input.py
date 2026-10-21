@@ -12,13 +12,15 @@ SPEC.loader.exec_module(tool)
 
 
 class SessionInputTests(unittest.TestCase):
-    def call(self, argv, sessions=("tmux",)):
+    def call(self, argv, sessions=("tmux",), pane=""):
         calls = []
 
         def fake(cmd):
             calls.append(cmd)
             if cmd[:2] == ["tmux", "has-session"]:
                 return "tmux" in sessions, ""
+            if cmd[:2] == ["tmux", "capture-pane"]:
+                return True, pane
             if cmd == ["screen", "-ls"]:
                 return True, "\t123.agent\t(Attached)\n" if "screen" in sessions else ""
             return True, ""
@@ -51,6 +53,16 @@ class SessionInputTests(unittest.TestCase):
         self.assertEqual(self.call(["keys", "--session", "agent", "rm -rf"])[0], 2)
         self.assertEqual(self.call(["send", "--session", "agent", "a\nb"])[0], 2)
         self.assertEqual(self.call(["send", "--session", "agent", "hi"], sessions=())[0], 2)
+
+    def test_send_refuses_open_dialog(self):
+        pane = "Edit file\n Do you want to make this edit?\n \u276f 1. Yes\n   2. No\n"
+        code, calls = self.call(["send", "--session", "agent", "hi"], pane=pane)
+        self.assertEqual(code, 4)
+        self.assertFalse([c for c in calls if c[:2] == ["tmux", "send-keys"]])
+        code, calls = self.call(["send", "--session", "agent", "--force", "hi"], pane=pane)
+        self.assertEqual(code, 0)
+        code, _ = self.call(["send", "--session", "agent", "hi"], pane="ready\n\u276f \n  \u276f \u25ef helper  compiling\n")
+        self.assertEqual(code, 0)
 
     def test_missing_program_is_failure(self):
         with mock.patch.object(tool.subprocess, "run", side_effect=FileNotFoundError):

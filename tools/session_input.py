@@ -7,8 +7,10 @@ The target is a tmux session (preferred) or a GNU screen session with that name.
   session_input.py keys --session NAME KEY...      press named keys only, for dialogs
 
 Keys: Enter, Escape, Tab, BTab, Up, Down, Left, Right and single digits.
-Read the target's screen before sending: text typed into an open dialog is lost, and its Enter
-answers the dialog. Exit codes: 2 for usage or a missing session, 3 when tmux or screen fails.
+Text typed into an open dialog is lost, and its Enter answers the dialog. So for a tmux target,
+send first reads the screen and refuses while a numbered choice ("❯ 1. ...") or a "Do you want
+to" question shows; answer it with keys, or pass --force. Screen targets are not read.
+Exit codes: 2 for usage or a missing session, 3 when tmux or screen fails, 4 when a dialog is open.
 """
 import argparse
 import re
@@ -53,6 +55,20 @@ def screen(name, text):
         sys.exit(3)
 
 
+DIALOG = re.compile(r"❯\s*\d+\.\s|Do you want to ")
+
+
+def open_dialog(name):
+    """Return the dialog line visible in a tmux pane's last 30 lines, or None."""
+    ok, text = output(["tmux", "capture-pane", "-p", "-t", f"={name}:"])
+    if not ok:
+        return None
+    for line in text.splitlines()[-30:]:
+        if DIALOG.search(line):
+            return line.strip()
+    return None
+
+
 def send(name, kind, message):
     for k in range(0, len(message), CHUNK):
         part = message[k:k + CHUNK]
@@ -81,6 +97,7 @@ def main():
     s = sub.add_parser("send")
     s.add_argument("--session", required=True)
     s.add_argument("message")
+    s.add_argument("--force", action="store_true", help="send even while a dialog shows")
     k = sub.add_parser("keys")
     k.add_argument("--session", required=True)
     k.add_argument("key", nargs="+")
@@ -95,6 +112,12 @@ def main():
     if kind is None:
         print(f"no tmux or screen session named {a.session}", file=sys.stderr)
         sys.exit(2)
+    if a.cmd == "send" and kind == "tmux" and not a.force:
+        line = open_dialog(a.session)
+        if line:
+            print(f"not sent: a dialog is open in {a.session}: {line!r}; answer it with keys, or pass --force",
+                  file=sys.stderr)
+            sys.exit(4)
     send(a.session, kind, a.message) if a.cmd == "send" else keys(a.session, kind, a.key)
 
 
