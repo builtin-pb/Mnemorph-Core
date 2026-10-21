@@ -8,9 +8,11 @@ The target is a tmux session (preferred) or a GNU screen session with that name.
 
 Keys: Enter, Escape, Tab, BTab, Up, Down, Left, Right and single digits.
 Text typed into an open dialog is lost, and its Enter answers the dialog. So for a tmux target,
-send first reads the screen and refuses while a numbered choice ("❯ 1. ...") or a "Do you want
-to" question shows; answer it with keys, or pass --force. Screen targets are not read.
-Exit codes: 2 for usage or a missing session, 3 when tmux or screen fails, 4 when a dialog is open.
+send first reads the screen and refuses while a numbered choice ("❯ 1. ...", or a rating row
+such as "1: Bad    2: Fine") or a "Do you want to" question shows, or when the screen cannot be
+read; answer the dialog with keys, or pass --force. Screen targets are not read.
+Exit codes: 2 for usage or a missing session, 3 when tmux or screen fails (including an unreadable
+pane), 4 when a dialog is open.
 """
 import argparse
 import re
@@ -55,14 +57,14 @@ def screen(name, text):
         sys.exit(3)
 
 
-DIALOG = re.compile(r"❯\s*\d+\.\s|Do you want to ")
+DIALOG = re.compile(r"❯\s*\d+\.\s|Do you want to |(?:^|\s)\d: \S+ +\d: ")
 
 
 def open_dialog(name):
-    """Return the dialog line visible in a tmux pane's last 30 lines, or None."""
+    """Return the dialog line visible in a tmux pane's last 30 lines, None, or False when unreadable."""
     ok, text = output(["tmux", "capture-pane", "-p", "-t", f"={name}:"])
     if not ok:
-        return None
+        return False
     for line in text.splitlines()[-30:]:
         if DIALOG.search(line):
             return line.strip()
@@ -114,6 +116,9 @@ def main():
         sys.exit(2)
     if a.cmd == "send" and kind == "tmux" and not a.force:
         line = open_dialog(a.session)
+        if line is False:
+            print(f"not sent: cannot read the screen of {a.session}; check it, or pass --force", file=sys.stderr)
+            sys.exit(3)
         if line:
             print(f"not sent: a dialog is open in {a.session}: {line!r}; answer it with keys, or pass --force",
                   file=sys.stderr)
