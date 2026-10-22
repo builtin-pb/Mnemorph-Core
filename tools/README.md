@@ -18,7 +18,7 @@ The [retrieval contract](../src/core/memory/retrieval.md) covers discovery, sect
 
 ## Budgets
 
-[memory-limits.json](../memory-limits.json) is the shared size policy and names only Core files. An instance keeps allowances for its own memory in an optional `src/memory-limits.json` with `rules` and `files` in the same form; its rules apply after the shared ones and its file limits replace shared ones. [size_guard.py](size_guard.py) `install` adds a pre-commit hook refusing to grow a governed file past its limit (inbox exempt).
+[memory-limits.json](../memory-limits.json) is the shared size policy and names only Core files. An instance keeps allowances for its own memory in an optional `src/memory-limits.json` with `rules` and `files` in the same form; its rules apply after the shared ones and its file limits replace shared ones. [size_guard.py](size_guard.py) `install` adds a pre-commit hook refusing to grow a governed file past its limit (inbox exempt). Another project keeps its instruction limits in its own root `memory-limits.json`, checked by `memory.py --root` and guarded by `install` there.
 
 ## Record check
 

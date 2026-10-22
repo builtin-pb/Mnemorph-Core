@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Refuse a commit that leaves a governed memory file over its character limit.
+"""Refuse a commit that leaves a governed memory or instruction file over its character limit.
 
 `install` writes a small `pre-commit` hook into the repository's common git
-directory (so linked worktrees are covered) that runs this checkout's own
-copy of this script. Git then runs `hook` before every commit: for each file
-the commit adds or changes that memory-limits.json governs, it measures the
+directory (so linked worktrees are covered). In a Mnemorph checkout the hook
+runs that checkout's own copy of this script; in another project, which keeps
+the limits for its own instruction files in a root memory-limits.json, it runs
+the installing copy by absolute path. Git then runs `hook` before every
+commit: for each file the commit adds or changes that memory-limits.json
+governs, it measures the
 staged text, as memory.py's size check does for the working tree, and
 refuses the commit when that text is over its limit and longer than the
 version in HEAD. Shrinking a file that is already over is allowed, so a
@@ -16,6 +19,7 @@ Standard library only.
 from __future__ import annotations
 
 import argparse
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -31,6 +35,10 @@ guard="$(git rev-parse --show-toplevel)/tools/size_guard.py"
 [ -f "$guard" ] || exit 0
 exec python3 "$guard" hook
 """
+PROJECT_HOOK = (f"#!/bin/sh\n# {MARKER}: installed by tools/size_guard.py for this project's memory-limits.json.\n"
+                "guard=%s\n"
+                'if [ ! -f "$guard" ]; then echo "size_guard: $guard is gone; this commit was not checked." >&2; exit 0; fi\n'
+                'exec python3 "$guard" hook\n')
 
 
 def git(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -91,10 +99,10 @@ def cmd_hook(_args) -> int:
         return 0
     if not found:
         return 0
-    print("size_guard: this commit would leave memory over its size limit:", file=sys.stderr)
+    print("size_guard: this commit would leave a governed file over its size limit:", file=sys.stderr)
     for line in found:
         print(f"  {line}", file=sys.stderr)
-    print("Reconstruct the file to fit (src/core/memory/memory.md, \"Reading budgets\") "
+    print("Reconstruct the file to fit (Mnemorph's src/core/memory/memory.md, \"Reading budgets\") "
           "or adopt a reviewed exact allowance in memory-limits.json, then commit again.",
           file=sys.stderr)
     return 1
@@ -108,7 +116,12 @@ def cmd_install(_args) -> int:
     path = hooks / "pre-commit"
     if path.exists() and MARKER not in path.read_text(encoding="utf-8", errors="replace"):
         raise SystemExit(f"refusing to install: {path} exists and is not a {MARKER}")
-    path.write_text(HOOK, encoding="utf-8")
+    own = (root / "tools" / "size_guard.py").is_file()
+    try:
+        memory.load_limits(root)
+    except memory.MemoryError as exc:
+        raise SystemExit(f"refusing to install: {exc}")
+    path.write_text(HOOK if own else PROJECT_HOOK % shlex.quote(str(Path(__file__).resolve())), encoding="utf-8")
     path.chmod(0o755)
     print(f"installed {path}; undo: delete it")
     return 0

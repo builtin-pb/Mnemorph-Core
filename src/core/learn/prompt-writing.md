@@ -17,7 +17,7 @@ Identify behavior, constraints, decisions and result. Separate requirements from
 
 Inspect existing behavior and find the affected responsibility. Avoid redundant rules. Edit locally if that responsibility is clear; reorganize or rewrite if an addition would tangle or scatter it. Preserve requirements and useful content, not inherited wording.
 
-Choose the rule, demonstration, interface or activation route the consumer will meet. State condition, action and result; check whether defaults or examples narrow the goal. [Reading budgets](../memory/memory.md#reading-budgets) expose growth, not semantic adequacy.
+Choose the rule, demonstration, interface or activation route the consumer will meet. State condition, action and result; check whether defaults or examples narrow the goal. Give each instruction file a character limit derived from its importance and expected content, not its current size; a project keeps its own in a root `memory-limits.json`, enforced by `tools/size_guard.py install`. Designs, logs and records read by search may be as long as their content needs. [Reading budgets](../memory/memory.md#reading-budgets) expose growth, not semantic adequacy.
 
 ### Challenge
 

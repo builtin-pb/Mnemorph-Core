@@ -28,6 +28,7 @@
     "src/core/learn/coordination.md": 6100,
     "src/core/learn/learn.md": 10500,
     "src/core/learn/mechanism-design.md": 8500,
+    "src/core/learn/prompt-writing.md": 6260,
     "src/core/memory/memory.md": 9250,
     "src/core/memory/lesson-tests.md": 8600,
     "src/core/memory/periodic-reflection.md": 7700,
@@ -38,6 +39,6 @@
     "src/core/taste/guard/charter.md": 7819,
     "src/core/taste/taste.md": 6641,
     "src/core/taste/theory.md": 7000,
-    "tools/README.md": 6900
+    "tools/README.md": 7020
   }
 }
